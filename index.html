@@ -12,7 +12,7 @@
         @media (max-width: 1000px) { .dashboard { grid-template-columns: 1fr; } }
         .panel { background: var(--container-bg); border-radius: 8px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 15px; }
         h2 { margin-top: 0; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; font-size: 13pt; letter-spacing: 0.5px; color: #e0e0e0; }
-        #map { height: 500px; width: 100%; border-radius: 6px; border: 1px solid var(--border-color); background: #151515; }
+        #map { height: 450px; width: 100%; border-radius: 6px; border: 1px solid var(--border-color); background: #151515; }
         select { width: 100%; padding: 12px; border-radius: 6px; background: #383838; color: white; border: 1px solid var(--border-color); font-size: 11pt; }
         .result-box { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; display: flex; flex-direction: column; gap: 12px; }
         #console-log { width: 100%; height: 100px; font-family: 'Courier New', monospace; font-size: 9pt; background: #111111; color: #00ff00; padding: 10px; box-sizing: border-box; border-radius: 4px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #444; }
@@ -25,6 +25,9 @@
         .stat-card.purple { border-left: 4px solid #6A1B9A; }
         .stat-name { font-size: 8.5pt; color: #b0b0b0; text-transform: uppercase; font-weight: 600; }
         .stat-val { font-size: 14pt; font-weight: bold; color: #00ff00; margin-top: 4px; }
+        
+        /* Contenedor del Gráfico debajo del mapa */
+        .chart-container { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; position: relative; height: 280px; width: 100%; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -37,6 +40,10 @@
             <select id="layer-select"></select>
         </div>
         <div id="map"></div>
+        
+        <div class="chart-container">
+            <canvas id="dailyChart"></canvas>
+        </div>
     </div>
 
     <div class="panel">
@@ -102,6 +109,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
     const REPO_OWNER = "agricien";
@@ -119,8 +127,37 @@
     let rasterHeight = 0;
     let boundsConfigured = false; 
     let currentYearGlobal = 2015;
+    let dailyChartInstance = null;
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+    // Inicialización del gráfico diario vacío
+    function initChart() {
+        const ctx = document.getElementById('dailyChart').getContext('2d');
+        dailyChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: Array.from({length: 365}, (_, i) => `Día ${i + 1}`),
+                datasets: [{
+                    label: 'Precipitación Diaria (mm)',
+                    data: [],
+                    backgroundColor: '#1565C0',
+                    borderWidth: 0,
+                    barPercentage: 1.0,
+                    categoryPercentage: 1.0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { grid: { display: false }, ticks: { display: false } },
+                    y: { grid: { color: '#444' }, title: { display: true, text: 'mm', color: '#aaa' }, ticks: { color: '#aaa' } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
 
     function setupSelector() {
         const selectEl = document.getElementById('layer-select');
@@ -132,6 +169,7 @@
         });
         selectEl.value = "CHELSA_prec_2015_stack.tif";
         extractYear(selectEl.value);
+        initChart();
         initRemoteTiff(selectEl.value);
     }
 
@@ -140,7 +178,6 @@
         currentYearGlobal = match ? parseInt(match[1]) : 2015;
     }
 
-    // Retorna la distribución exacta de días por mes según el año
     function getDaysInMonths(year) {
         const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
         return [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -163,7 +200,6 @@
 
             printLog(`Metadatos GeoTIFF decodificados.`);
 
-            // Restringir la vista del mapa SOLO la primera vez que se carga la aplicación
             if (!boundsConfigured) {
                 const padding = 0.05;
                 const southWest = L.latLng(rasterBounds[1] - padding, rasterBounds[0] - padding);
@@ -173,7 +209,7 @@
                 map.setMaxBounds(strictBounds);
                 map.fitBounds(strictBounds);
                 boundsConfigured = true;
-                printLog(`Restricción de área activa: Vista confinada a la extensión de Costa Rica.`);
+                printLog(`Restricción de área activa: Vista confinada a Costa Rica.`);
             }
 
         } catch (err) {
@@ -189,7 +225,6 @@
 
         if (!tiffImage || !rasterBounds) return;
 
-        // Validar geográficamente si el clic cae dentro de la matriz del raster
         if (lng < rasterBounds[0] || lng > rasterBounds[2] || lat < rasterBounds[1] || lat > rasterBounds[3]) {
             printLog("Clic fuera del área de cobertura del GeoTIFF.");
             return;
@@ -219,48 +254,44 @@
             let countDry = 0;
             let countRain = 0;
 
-            // Variables para el cálculo de rachas continuas
             let maxDryStreak = 0;
             let currentDryStreak = 0;
             let maxRainStreak = 0;
             let currentRainStreak = 0;
 
-            // Arrays para estructurar acumulación por meses
             const daysInMonths = getDaysInMonths(currentYearGlobal);
             const monthlyTotals = new Array(12).fill(0);
             const monthlyValidDays = new Array(12).fill(0);
 
             let currentMonthIdx = 0;
             let daysAccumulatedInCurrentMonth = 0;
+            
+            // Array para almacenar la serie limpia que alimentará el gráfico
+            const chartDataArray = [];
 
             for (let i = 0; i < totalBands; i++) {
                 let cellVal = rasterData[i][0];
                 
                 if (cellVal !== null && cellVal !== -9999 && !isNaN(cellVal)) {
                     cellVal = cellVal * CHELSA_SCALE_FACTOR;
-                    if (cellVal < 0) cellVal = 0; // Corrección de límites inferiores espurios
+                    if (cellVal < 0) cellVal = 0; 
 
                     totalAcum += cellVal;
                     validDays++;
+                    chartDataArray.push(cellVal);
 
-                    // 1. Clasificación y conteo de días
                     if (cellVal === 0) {
                         countDry++;
-                        // Lógica de racha seca
                         currentDryStreak++;
                         if (currentDryStreak > maxDryStreak) maxDryStreak = currentDryStreak;
-                        // Romper racha lluviosa
                         currentRainStreak = 0;
                     } else {
                         countRain++;
-                        // Lógica de racha lluviosa
                         currentRainStreak++;
                         if (currentRainStreak > maxRainStreak) maxRainStreak = currentRainStreak;
-                        // Romper racha seca
                         currentDryStreak = 0;
                     }
 
-                    // 2. Agregación temporal por meses naturales
                     monthlyTotals[currentMonthIdx] += cellVal;
                     monthlyValidDays[currentMonthIdx]++;
                     
@@ -278,7 +309,6 @@
                 return;
             }
 
-            // Determinar extremos mensuales (Mes más seco / más lluvioso)
             let maxMonthVal = -Infinity;
             let minMonthVal = Infinity;
             let bestMonthIdx = 0;
@@ -294,6 +324,11 @@
 
             const promedio = totalAcum / validDays;
 
+            // Actualizar datos y etiquetas del gráfico dinámicamente
+            dailyChartInstance.data.labels = Array.from({length: validDays}, (_, i) => `Día ${i + 1}`);
+            dailyChartInstance.data.datasets[0].data = chartDataArray;
+            dailyChartInstance.update();
+
             // Renderizado de métricas avanzadas en el Dashboard
             document.getElementById('stat-acum').innerText = `${totalAcum.toFixed(1)} mm`;
             document.getElementById('stat-prom').innerText = `${promedio.toFixed(2)} mm/d`;
@@ -301,11 +336,11 @@
             document.getElementById('stat-days-dry').innerText = `${countDry} días`;
             document.getElementById('stat-streak-dry').innerText = `${maxDryStreak} días seguidos`;
             document.getElementById('stat-streak-rain').innerText = `${maxRainStreak} días seguidos`;
-            document.getElementById('stat-month-dry').innerText = `${MONTH_NAMES[worstMonthIdx]} (${maxMonthVal === minMonthVal ? '0.0' : minMonthVal.toFixed(1)} mm)`;
+            document.getElementById('stat-month-dry').innerText = `${MONTH_NAMES[worstMonthIdx]} (${minMonthVal.toFixed(1)} mm)`;
             document.getElementById('stat-month-rain').innerText = `${MONTH_NAMES[bestMonthIdx]} (${maxMonthVal.toFixed(1)} mm)`;
             
             document.getElementById('raster-bands-info').innerText = `Procesamiento exitoso: ${validDays} capas analizadas de forma síncrona.`;
-            printLog(`Análisis estadístico e indicadores de extremos climáticos completos.`);
+            printLog(`Análisis estadístico y gráfico de barras diario completados.`);
 
         } catch (err) {
             printLog(`Error al procesar series de tiempo: ${err.message}`);
@@ -322,6 +357,10 @@
         document.getElementById('stat-month-dry').innerText = "—";
         document.getElementById('stat-month-rain').innerText = "—";
         document.getElementById('raster-bands-info').innerText = "";
+        if (dailyChartInstance) {
+            dailyChartInstance.data.datasets[0].data = [];
+            dailyChartInstance.update();
+        }
     }
 
     function printLog(msg) { const consoleEl = document.getElementById('console-log'); consoleEl.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`; consoleEl.scrollTop = consoleEl.scrollHeight; }
