@@ -84,7 +84,7 @@
         .modal-logo { height: 40px; width: auto; object-fit: contain; }
         .modal-title { margin: 0; font-size: 14pt; color: #ffffff; }
         .modal-body { font-size: 10.5pt; line-height: 1.5; color: #dddddd; display: flex; flex-direction: column; gap: 12px; }
-        .modal-meta-label { font-size: 9pt; color: #888888; text-transform: uppercase; font-weight: 600; }
+        .modal-meta-label { font-size: 9pt; color: #888888; text-transform: uppercase; font-weight: 600; margin-bottom: 2px; }
         .modal-meta-val { color: #ffffff; font-size: 10pt; }
         .modal-meta-val a { color: #00E5FF; text-decoration: none; }
         .btn-close-modal { position: absolute; top: 15px; right: 15px; background: none; border: none; color: #aaa; font-size: 16pt; cursor: pointer; }
@@ -236,7 +236,8 @@
     const REPO_NAME = "enos";
     const BRANCH = "main";
     
-    const YEARS = [1982,1983,1997,1998,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2020,2021,2022,2023,2024,2025];
+    // CORRECCIÓN: Inclusión explícita de los años 1972 y 1973 en la constante maestra
+    const YEARS = [1972,1973,1982,1983,1997,1998,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2020,2021,2022,2023,2024,2025];
     const MONTH_NAMES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const SHORT_MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -247,8 +248,6 @@
     let rasterWidth = 0, rasterHeight = 0;
     let boundsConfigured = false; 
     let currentYearGlobal = 2015;
-    
-    // ANCLA DE VERDAD: Coordenadas geográficas puras fijadas por el usuario
     let geoAnchorCoords = null; 
 
     let dailyChartInstance = null;
@@ -377,7 +376,6 @@
                             callback: function(val) {
                                 const label = this.getLabelForValue(val);
                                 if (!label) return null;
-                                
                                 if (compareXMode === "calendar") {
                                     if (label.startsWith("01 ") || label.startsWith("15 ")) {
                                         return label.startsWith("01 ") ? label.split(' ')[1] : label.split(' ')[0];
@@ -507,10 +505,7 @@
                 const strictBounds = L.latLngBounds(L.latLng(rasterBounds[1] - padding, rasterBounds[0] - padding), L.latLng(rasterBounds[3] + padding, rasterBounds[2] + padding));
                 map.setMaxBounds(strictBounds); map.fitBounds(strictBounds); boundsConfigured = true;
             }
-            // Si el usuario cambia el año del combo, pero ya había hecho clic en el mapa, re-analizar dinámicamente las coordenadas geográficas ancladas
-            if (geoAnchorCoords) {
-                executeSingleAnalysis();
-            }
+            if (geoAnchorCoords) { executeSingleAnalysis(); }
         } catch (err) { printLog(`Error: ${err.message}`); }
     }
 
@@ -524,7 +519,6 @@
         document.getElementById('click-coords').innerHTML = `<b>Coordenadas del Píxel:</b> Lat: ${lat.toFixed(5)}, Lon: ${lng.toFixed(5)}`;
         if (activeMarker) map.removeLayer(activeMarker); activeMarker = L.marker([lat, lng]).addTo(map);
 
-        // Almacenar el anclaje absoluto geográfico real
         geoAnchorCoords = { lat, lng };
         executeSingleAnalysis();
     });
@@ -532,7 +526,6 @@
     async function executeSingleAnalysis() {
         if (!geoAnchorCoords || !tiffImage) return;
         try {
-            // Calcular dinámicamente la celda de la matriz asociada a las coordenadas geográficas actuales del stack cargado
             const posX = Math.floor(((geoAnchorCoords.lng - rasterBounds[0]) / (rasterBounds[2] - rasterBounds[0])) * rasterWidth);
             const posY = Math.floor(((rasterBounds[3] - geoAnchorCoords.lat) / (rasterBounds[3] - rasterBounds[1])) * rasterHeight);
 
@@ -576,7 +569,6 @@
         } catch (err) { printLog(`Error: ${err.message}`); }
     }
 
-    // --- PIPELINE DE COMPARACIÓN INTERANUAL BASADO EN COORDENADAS GEOGRÁFICAS ---
     document.getElementById('btn-run-compare').addEventListener('click', async function() {
         if (!geoAnchorCoords) { alert("Seleccione primero un punto geográfico en el mapa del Tablero Principal."); return; }
         const checkedBoxes = document.querySelectorAll('.year-chk:checked');
@@ -594,7 +586,6 @@
                 const img = await instance.getImage();
                 const w = img.getWidth(); const h = img.getHeight(); const b = img.getBoundingBox();
                 
-                // Mapeo espacial local e independiente para el archivo de este año específico
                 const posX = Math.floor(((geoAnchorCoords.lng - b[0]) / (b[2] - b[0])) * w);
                 const posY = Math.floor(((b[3] - geoAnchorCoords.lat) / (b[3] - b[1])) * h);
 
