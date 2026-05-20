@@ -73,7 +73,7 @@
         
         .chart-container { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; position: relative; height: 340px; width: 100%; }
 
-        .checkbox-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; max-height: 180px; overflow-y: auto; background: #1e1e1e; padding: 15px; border-radius: 6px; border: 1px solid var(--border-color); }
+        .checkbox-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; max-height: 150px; overflow-y: auto; background: #1e1e1e; padding: 15px; border-radius: 6px; border: 1px solid var(--border-color); }
         .checkbox-item { display: flex; align-items: center; gap: 8px; font-size: 10pt; cursor: pointer; }
         .checkbox-item input { cursor: pointer; width: 16px; height: 16px; accent-color: var(--accent-purple); }
 
@@ -175,9 +175,17 @@
 <div class="dashboard tab-view" id="view-compare">
     <div class="panel">
         <h2>1. Selección de Coberturas para Comparación</h2>
-        <p style="font-size: 9.5pt; color: #aaa; margin: 0;">Marque las series anuales que desea cruzar. Los datos se extraerán del punto activo del mapa.</p>
         <div class="checkbox-container" id="compare-checkboxes"></div>
-        <button class="btn-action" id="btn-run-compare">Graficar Comparativa</button>
+        
+        <div style="margin-top: 5px;">
+            <label for="axis-mode-select" style="font-size: 9pt; color: #aaa; display:block; margin-bottom:5px;">Estructura del Eje X:</label>
+            <select id="axis-mode-select">
+                <option value="calendar">Mes Calendario (Semanas Divididas)</option>
+                <option value="julian">Día Juliano (Contador Continuo)</option>
+                <option value="lunar">Mes Lunar (Progreso de la Edad Lunar)</option>
+            </select>
+        </div>
+        <button class="btn-action" id="btn-run-compare" style="margin-top: 5px;">Graficar Comparativa</button>
     </div>
     <div class="panel">
         <h2>2. Tendencia Interanual Combinada (Fases Lunares Señaladas)</h2>
@@ -235,43 +243,35 @@
     let dailyChartInstance = null;
     let compareChartInstance = null;
     let mondayIndicesGlobal = [];
+    let compareXMode = "calendar"; // Opciones: calendar, julian, lunar
+    let globalCompareRawData = []; // Buffer de almacenamiento para alternar ejes al vuelo sin re-descargar tifs
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-    // --- ALGORITMO DE MEEUS FIJO PARA EVITAR SALTOS DE DÍA ---
     function getLunarAge(year, month, day) {
-        let Y = year;
-        let M = month;
-        if (M === 1 || M === 2) {
-            Y = year - 1;
-            M = month + 12;
-        }
-        const A = Math.floor(Y / 100);
-        const B = Math.floor(A / 4);
-        const C = 2 - A + B;
-        const E = Math.floor(365.25 * (Y + 4716));
-        const G = Math.floor(30.6001 * (M + 1));
+        let Y = year; let M = month;
+        if (M === 1 || M === 2) { Y = year - 1; M = month + 12; }
+        const A = Math.floor(Y / 100); const B = Math.floor(A / 4); const C = 2 - A + B;
+        const E = Math.floor(365.25 * (Y + 4716)); const G = Math.floor(30.6001 * (M + 1));
         const JD = C + day + E + G - 1524.5;
-
         let D = JD - 2451550.26;
         let F = (D / 29.530589) % 1;
         if (F < 0) F += 1;
-        
         return F * 29.530589; 
     }
 
-    // --- PLUGIN DEL CANVAS: COMPENSACIÓN CRÍTICA DE FECHAS ---
     const climateAstroPlugin = {
         id: 'climateAstroPlugin',
         afterDatasetsDraw(chart) {
             const { ctx, scales: { x, y } } = chart;
             ctx.save();
 
-            // 1. Dibujar líneas de Lunes
-            if (mondayIndicesGlobal && mondayIndicesGlobal.length > 0) {
-                ctx.strokeStyle = 'rgba(3, 169, 244, 0.35)'; 
-                ctx.lineWidth = 1;
-                ctx.setLineDash([3, 3]);
+            // Evaluar si corresponde dibujar líneas de lunes (Solo en modo Mes Calendario)
+            const isCompareChart = chart.canvas.id === "compareChart";
+            const showGridLines = !isCompareChart || (isCompareChart && compareXMode === "calendar");
+
+            if (showGridLines && mondayIndicesGlobal && mondayIndicesGlobal.length > 0) {
+                ctx.strokeStyle = 'rgba(3, 169, 244, 0.35)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
                 mondayIndicesGlobal.forEach(idx => {
                     const meta = chart.getDatasetMeta(0);
                     if (meta.data[idx]) {
@@ -281,44 +281,39 @@
                 });
             }
 
-            // 2. Dibujar una Sola Luna Llena Astronómica Real por mes (Bypass a duplicados locales)
+            // Marcado inteligente de lunas llenas en curvas temporales
             chart.data.datasets.forEach((dataset, datasetIdx) => {
                 const meta = chart.getDatasetMeta(datasetIdx);
                 if (!meta.hidden && meta.data.length > 0) {
-                    let lastMarkedMonthKey = ""; // Almacena "AÑO-MES" para evitar marcas múltiples el mismo mes
+                    let lastMarkedMonthKey = "";
 
                     chart.data.labels.forEach((label, idx) => {
-                        if (!label) return;
-                        const parts = label.split('-');
-                        if (parts.length !== 3) return;
-                        
-                        const currentYear = parseInt(parts[0]);
-                        const currentMonth = parseInt(parts[1]);
-                        const currentDay = parseInt(parts[2]);
-                        const monthKey = `${currentYear}-${currentMonth}`;
+                        if (!label || isNaN(idx)) return;
+                        let currentYear = currentYearGlobal, currentMonth = 1, currentDay = 1;
 
+                        if (isCompareChart) {
+                            if (compareXMode === "calendar") {
+                                const parts = label.split('-');
+                                if (parts.length === 3) { currentYear = parseInt(parts[0]); currentMonth = parseInt(parts[1]); currentDay = parseInt(parts[2]); }
+                            } else if (compareXMode === "julian") {
+                                // Mapeo inverso de día juliano a componentes gregorianos para Meeus
+                                let dateFromJulian = new Date(Date.UTC(currentYear, 0, idx + 1));
+                                currentMonth = dateFromJulian.getUTCMonth() + 1; currentDay = dateFromJulian.getUTCDate();
+                            } else { return; } // En modo puramente lunar el eje X ya representa la luna, no requiere puntos flotantes
+                        } else {
+                            const parts = label.split('-');
+                            if (parts.length === 3) { currentYear = parseInt(parts[0]); currentMonth = parseInt(parts[1]); currentDay = parseInt(parts[2]); }
+                        }
+
+                        const monthKey = `${currentYear}-${currentMonth}`;
                         const lAge = getLunarAge(currentYear, currentMonth, currentDay);
                         
-                        // Si está en la ventana de luna llena astronómica y no hemos marcado este mes todavía
                         if (Math.abs(lAge - 14.76) <= 1.0 && monthKey !== lastMarkedMonthKey) {
                             const point = meta.data[idx];
                             if (point) {
-                                const xPos = point.x;
-                                const yPos = point.y;
-
-                                ctx.beginPath();
-                                ctx.arc(xPos, yPos, 5, 0, 2 * Math.PI);
-                                ctx.fillStyle = '#FFFFFF';
-                                ctx.shadowBlur = 6;
-                                ctx.shadowColor = '#FFF';
-                                ctx.fill();
-                                
-                                ctx.lineWidth = 1;
-                                ctx.strokeStyle = '#000000';
-                                ctx.stroke();
-                                ctx.shadowBlur = 0; 
-
-                                // Bloquear el mes actual para que no se dibujen lunas los días adyacentes de la misma ventana
+                                ctx.beginPath(); ctx.arc(point.x, point.y, 5, 0, 2 * Math.PI);
+                                ctx.fillStyle = '#FFFFFF'; ctx.shadowBlur = 6; ctx.shadowColor = '#FFF'; ctx.fill();
+                                ctx.lineWidth = 1; ctx.strokeStyle = '#000000'; ctx.stroke(); ctx.shadowBlur = 0;
                                 lastMarkedMonthKey = monthKey;
                             }
                         }
@@ -329,7 +324,7 @@
         }
     };
 
-    // --- MANEJADOR DE PESTAÑAS (TABS) ---
+    // Navegación de pestañas
     document.querySelectorAll('.btn-nav').forEach(btn => {
         btn.addEventListener('click', function() {
             if (this.id === 'openAbout') return;
@@ -337,7 +332,6 @@
             document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
             this.classList.add('active');
             document.getElementById(this.dataset.target).classList.add('active');
-            
             if (dailyChartInstance) dailyChartInstance.resize();
             if (compareChartInstance) compareChartInstance.resize();
         });
@@ -367,12 +361,25 @@
         const ctxCompare = document.getElementById('compareChart').getContext('2d');
         compareChartInstance = new Chart(ctxCompare, {
             type: 'line',
-            data: { labels: Array.from({length: 365}, (_, i) => `Día ${i + 1}`), datasets: [] },
+            data: { labels: [], datasets: [] },
             options: {
                 responsive: true, maintainAspectRatio: false, resizeDelay: 100,
                 elements: { point: { radius: 0, hoverRadius: 4 } }, 
                 scales: {
-                    x: { grid: { color: '#333' }, ticks: { color: '#aaa', font: { size: 9 }, maxTicksLimit: 20 } },
+                    x: { 
+                        grid: { color: '#333' }, 
+                        ticks: { 
+                            color: '#aaa', font: { size: 9 }, maxTicksLimit: 20,
+                            callback: function(val) {
+                                const label = this.getLabelForValue(val);
+                                if (compareXMode === "calendar") {
+                                    if (label && (label.endsWith("-01") || label.endsWith("-15"))) { const parts = label.split('-'); return label.endsWith("-01") ? SHORT_MONTHS[parseInt(parts[1]) - 1] : parts[2]; }
+                                    return null;
+                                }
+                                return label; 
+                            }
+                        } 
+                    },
                     y: { grid: { color: '#444' }, title: { display: true, text: 'Precipitación Acumulada Diaria (mm)', color: '#aaa' }, ticks: { color: '#aaa' } }
                 },
                 plugins: { 
@@ -387,28 +394,16 @@
     function setupSelectorAndCheckboxes() {
         const selectEl = document.getElementById('layer-select');
         const checkContainer = document.getElementById('compare-checkboxes');
-        
         YEARS.forEach(y => {
-            const opt = document.createElement('option');
-            opt.value = `CHELSA_prec_${y}_stack.tif`;
-            opt.text = `Año ${y} (Daily Stack)`;
-            selectEl.appendChild(opt);
-
-            const label = document.createElement('label');
-            label.className = 'checkbox-item';
-            label.innerHTML = `<input type="checkbox" value="${y}" class="year-chk"> ${y}`;
-            checkContainer.appendChild(label);
+            const opt = document.createElement('option'); opt.value = `CHELSA_prec_${y}_stack.tif`; opt.text = `Año ${y} (Daily Stack)`; selectEl.appendChild(opt);
+            const label = document.createElement('label'); label.className = 'checkbox-item'; label.innerHTML = `<input type="checkbox" value="${y}" class="year-chk"> ${y}`; checkContainer.appendChild(label);
         });
-        
-        selectEl.value = "CHELSA_prec_2015_stack.tif";
-        extractYear(selectEl.value);
-        initCharts();
-        initRemoteTiff(selectEl.value);
+        selectEl.value = "CHELSA_prec_2015_stack.tif"; extractYear(selectEl.value);
+        initCharts(); initRemoteTiff(selectEl.value);
     }
 
     function extractYear(fileName) {
-        const match = fileName.match(/_(\d{4})_/);
-        currentYearGlobal = match ? parseInt(match[1]) : 2015;
+        const match = fileName.match(/_(\d{4})_/); currentYearGlobal = match ? parseInt(match[1]) : 2015;
     }
 
     function getDaysInMonths(year) {
@@ -416,84 +411,44 @@
         return [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     }
 
-    // --- GENERADOR DE FECHAS SEGURO (ESTRICTAMENTE EN UTC SIN DESFASES) ---
     function generateCalendarLabels(year, totalBands) {
-        const labels = [];
-        mondayIndicesGlobal = [];
-        
-        // Inicializar de forma síncrona usando componentes enteros controlados
-        let currentYear = year;
-        let currentMonth = 0; // Enero
-        let currentDay = 1;
-        
+        const labels = []; mondayIndicesGlobal = [];
+        let currentYear = year, currentMonth = 0, currentDay = 1;
         const daysInMonths = getDaysInMonths(year);
 
         for (let i = 0; i < totalBands; i++) {
-            const mmStr = String(currentMonth + 1).padStart(2, '0');
-            const ddStr = String(currentDay).padStart(2, '0');
-            labels.push(`${currentYear}-${mmStr}-${ddStr}`);
-
-            // Validar de forma matemática el día de la semana para los Lunes sin usar Date local
+            labels.push(`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`);
             const testDate = new Date(Date.UTC(currentYear, currentMonth, currentDay));
-            if (testDate.getUTCDay() === 1) {
-                mondayIndicesGlobal.push(i);
-            }
-
+            if (testDate.getUTCDay() === 1) mondayIndicesGlobal.push(i);
+            
             currentDay++;
-            if (currentDay > daysInMonths[currentMonth]) {
-                currentDay = 1;
-                currentMonth++;
-                if (currentMonth > 11) {
-                    currentMonth = 0;
-                    currentYear++;
-                }
-            }
+            if (currentDay > daysInMonths[currentMonth]) { currentDay = 1; currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear++; } }
         }
         return labels;
     }
 
     function getThermalGradientColor(value, min, max) {
-        if (max === min) return '#00E5FF';
-        const ratio = (value - min) / (max - min); 
-        
+        if (max === min) return '#00E5FF'; const ratio = (value - min) / (max - min);
         let r = 0, g = 0, b = 0;
-        if (ratio > 0.75) { 
-            const segmentRatio = (ratio - 0.75) / 0.25;
-            r = Math.round(13 + (1-segmentRatio) * 30); g = Math.round(71 + segmentRatio * 150); b = Math.round(161 + (1-segmentRatio) * 50);
-        } else if (ratio > 0.50) { 
-            const segmentRatio = (ratio - 0.50) / 0.25;
-            r = Math.round(255 * (1 - segmentRatio)); g = 200; b = 0;
-        } else if (ratio > 0.25) { 
-            const segmentRatio = (ratio - 0.25) / 0.25;
-            r = 255; g = Math.round(200 * segmentRatio + 100 * (1 - segmentRatio)); b = 0;
-        } else { 
-            const segmentRatio = ratio / 0.25;
-            r = 255; g = Math.round(100 * segmentRatio); b = 0;
-        }
+        if (ratio > 0.75) { const seg = (ratio - 0.75) / 0.25; r = Math.round(13 + (1-seg) * 30); g = Math.round(71 + seg * 150); b = Math.round(161 + (1-seg) * 50); }
+        else if (ratio > 0.50) { const seg = (ratio - 0.50) / 0.25; r = Math.round(255 * (1 - seg)); g = 200; b = 0; }
+        else if (ratio > 0.25) { const seg = (ratio - 0.25) / 0.25; r = 255; g = Math.round(200 * seg + 100 * (1 - seg)); b = 0; }
+        else { const seg = ratio / 0.25; r = 255; g = Math.round(100 * seg); b = 0; }
         return `rgb(${r}, ${g}, ${b})`;
     }
 
     async function initRemoteTiff(fileName) {
-        if (!fileName) return;
-        extractYear(fileName);
-        printLog(`Estableciendo pasarela con stream binario de: ${fileName}`);
+        if (!fileName) return; extractYear(fileName);
         const rawUrl = `https://media.githubusercontent.com/media/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${fileName}`;
-
         try {
             const tiffInstance = await GeoTIFF.fromUrl(rawUrl, { forceCSPIsolation: true });
-            tiffImage = await tiffInstance.getImage();
-            rasterWidth = tiffImage.getWidth();
-            rasterHeight = tiffImage.getHeight();
-            rasterBounds = tiffImage.getBoundingBox();
-
+            tiffImage = await tiffInstance.getImage(); rasterWidth = tiffImage.getWidth(); rasterHeight = tiffImage.getHeight(); rasterBounds = tiffImage.getBoundingBox();
             if (!boundsConfigured) {
                 const padding = 0.05;
                 const strictBounds = L.latLngBounds(L.latLng(rasterBounds[1] - padding, rasterBounds[0] - padding), L.latLng(rasterBounds[3] + padding, rasterBounds[2] + padding));
-                map.setMaxBounds(strictBounds); map.fitBounds(strictBounds);
-                boundsConfigured = true;
-                printLog(`Fijado geográfico completo sobre Costa Rica.`);
+                map.setMaxBounds(strictBounds); map.fitBounds(strictBounds); boundsConfigured = true;
             }
-        } catch (err) { printLog(`Error de lectura remota: ${err.message}`); }
+        } catch (err) { printLog(`Error: ${err.message}`); }
     }
 
     document.getElementById('layer-select').addEventListener('change', e => initRemoteTiff(e.target.value));
@@ -504,14 +459,11 @@
         if (lng < rasterBounds[0] || lng > rasterBounds[2] || lat < rasterBounds[1] || lat > rasterBounds[3]) return;
 
         document.getElementById('click-coords').innerHTML = `<b>Coordenadas del Píxel:</b> Lat: ${lat.toFixed(5)}, Lon: ${lng.toFixed(5)}`;
-        if (activeMarker) map.removeLayer(activeMarker);
-        activeMarker = L.marker([lat, lng]).addTo(map);
+        if (activeMarker) map.removeLayer(activeMarker); activeMarker = L.marker([lat, lng]).addTo(map);
 
         const posX = Math.floor(((lng - rasterBounds[0]) / (rasterBounds[2] - rasterBounds[0])) * rasterWidth);
         const posY = Math.floor(((rasterBounds[3] - lat) / (rasterBounds[3] - rasterBounds[1])) * rasterHeight);
-        activePixelCoords = { posX, posY }; 
-
-        printLog(`Muestreando celda matriz [X: ${posX}, Y: ${posY}]...`);
+        activePixelCoords = { posX, posY };
         executeSingleAnalysis();
     });
 
@@ -519,139 +471,142 @@
         if (!activePixelCoords || !tiffImage) return;
         try {
             const rasterData = await tiffImage.readRasters({ window: [activePixelCoords.posX, activePixelCoords.posY, activePixelCoords.posX + 1, activePixelCoords.posY + 1], interleave: false });
-            const totalBands = rasterData.length;
-            const CHELSA_SCALE_FACTOR = 0.1;
-
+            const totalBands = rasterData.length; const CHELSA_SCALE_FACTOR = 0.1;
             let totalAcum = 0, validDays = 0, countDry = 0, countRain = 0;
             let maxDryStreak = 0, currentDryStreak = 0, maxRainStreak = 0, currentRainStreak = 0;
-
-            const daysInMonths = getDaysInMonths(currentYearGlobal);
-            const monthlyTotals = new Array(12).fill(0);
-            const monthlyValidDays = new Array(12).fill(0);
+            const daysInMonths = getDaysInMonths(currentYearGlobal); const monthlyTotals = new Array(12).fill(0); const monthlyValidDays = new Array(12).fill(0);
             let currentMonthIdx = 0, daysAccumulatedInCurrentMonth = 0;
-            
-            const chartDataArray = [];
-            const dayToMonthMapping = []; 
+            const chartDataArray = []; const dayToMonthMapping = [];
 
             for (let i = 0; i < totalBands; i++) {
                 let cellVal = rasterData[i][0];
                 if (cellVal !== null && cellVal !== -9999 && !isNaN(cellVal)) {
-                    cellVal = cellVal * CHELSA_SCALE_FACTOR;
-                    if (cellVal < 0) cellVal = 0; 
-                    totalAcum += cellVal; validDays++;
-                    chartDataArray.push(cellVal);
-                    dayToMonthMapping.push(currentMonthIdx);
-
-                    if (cellVal === 0) {
-                        countDry++; currentDryStreak++;
-                        if (currentDryStreak > maxDryStreak) maxDryStreak = currentDryStreak;
-                        currentRainStreak = 0;
-                    } else {
-                        countRain++; currentRainStreak++;
-                        if (currentRainStreak > maxRainStreak) maxRainStreak = currentRainStreak;
-                        currentDryStreak = 0;
-                    }
-
-                    monthlyTotals[currentMonthIdx] += cellVal; monthlyValidDays[currentMonthIdx]++;
-                    daysAccumulatedInCurrentMonth++;
+                    cellVal = cellVal * CHELSA_SCALE_FACTOR; if (cellVal < 0) cellVal = 0;
+                    totalAcum += cellVal; validDays++; chartDataArray.push(cellVal); dayToMonthMapping.push(currentMonthIdx);
+                    if (cellVal === 0) { countDry++; currentDryStreak++; if (currentDryStreak > maxDryStreak) maxDryStreak = currentDryStreak; currentRainStreak = 0; }
+                    else { countRain++; currentRainStreak++; if (currentRainStreak > maxRainStreak) maxRainStreak = currentRainStreak; currentDryStreak = 0; }
+                    monthlyTotals[currentMonthIdx] += cellVal; monthlyValidDays[currentMonthIdx]++; daysAccumulatedInCurrentMonth++;
                     if (daysAccumulatedInCurrentMonth >= daysInMonths[currentMonthIdx]) { currentMonthIdx++; daysAccumulatedInCurrentMonth = 0; }
                 }
             }
-
             let maxMonthVal = -Infinity, minMonthVal = Infinity, bestMonthIdx = 0, worstMonthIdx = 0;
             for (let m = 0; m < 12; m++) {
-                if (monthlyValidDays[m] > 0) {
-                    const mVal = monthlyTotals[m];
-                    if (mVal > maxMonthVal) { maxMonthVal = mVal; bestMonthIdx = m; }
-                    if (mVal < minMonthVal) { minMonthVal = mVal; worstMonthIdx = m; }
-                }
+                if (monthlyValidDays[m] > 0) { const mVal = monthlyTotals[m]; if (mVal > maxMonthVal) { maxMonthVal = mVal; bestMonthIdx = m; } if (mVal < minMonthVal) { minMonthVal = mVal; worstMonthIdx = m; } }
             }
-
             const barColorsArray = [];
-            for (let i = 0; i < validDays; i++) {
-                barColorsArray.push(getThermalGradientColor(monthlyTotals[dayToMonthMapping[i]], minMonthVal, maxMonthVal));
-            }
+            for (let i = 0; i < validDays; i++) barColorsArray.push(getThermalGradientColor(monthlyTotals[dayToMonthMapping[i]], minMonthVal, maxMonthVal));
 
             dailyChartInstance.data.labels = generateCalendarLabels(currentYearGlobal, validDays);
-            dailyChartInstance.data.datasets[0].data = chartDataArray;
-            dailyChartInstance.data.datasets[0].backgroundColor = barColorsArray;
-            dailyChartInstance.update();
+            dailyChartInstance.data.datasets[0].data = chartDataArray; dailyChartInstance.data.datasets[0].backgroundColor = barColorsArray; dailyChartInstance.update();
 
             document.getElementById('stat-acum').innerText = `${totalAcum.toFixed(1)} mm`;
             document.getElementById('stat-prom').innerText = `${(totalAcum / validDays).toFixed(2)} mm/d`;
-            document.getElementById('stat-days-rain').innerText = `${countRain} días`;
-            document.getElementById('stat-days-dry').innerText = `${countDry} días`;
-            document.getElementById('stat-streak-dry').innerText = `${maxDryStreak} días seguidos`;
-            document.getElementById('stat-streak-rain').innerText = `${maxRainStreak} días seguidos`;
-            
-            const cardDry = document.getElementById('card-month-dry'); const cardRain = document.getElementById('card-month-rain');
-            document.getElementById('stat-month-dry').innerText = `${MONTH_NAMES[worstMonthIdx]} (${minMonthVal.toFixed(1)} mm)`;
-            document.getElementById('stat-month-rain').innerText = `${MONTH_NAMES[bestMonthIdx]} (${maxMonthVal.toFixed(1)} mm)`;
-            
-            cardDry.style.backgroundColor = '#B3E5FC'; cardDry.style.color = '#0277BD';
-            cardRain.style.backgroundColor = '#0D47A1'; cardRain.style.color = '#FFFFFF';
-            document.getElementById('raster-bands-info').innerText = `Procesamiento exitoso: ${validDays} capas analizadas de forma síncrona.`;
+            document.getElementById('stat-days-rain').innerText = `${countRain} días`; document.getElementById('stat-days-dry').innerText = `${countDry} días`;
+            document.getElementById('stat-streak-dry').innerText = `${maxDryStreak} días seguidos`; document.getElementById('stat-streak-rain').innerText = `${maxRainStreak} días seguidos`;
+            document.getElementById('stat-month-dry').innerText = `${MONTH_NAMES[worstMonthIdx]} (${minMonthVal.toFixed(1)} mm)`; document.getElementById('stat-month-rain').innerText = `${MONTH_NAMES[bestMonthIdx]} (${maxMonthVal.toFixed(1)} mm)`;
+            document.getElementById('card-month-dry').style.backgroundColor = '#B3E5FC'; document.getElementById('card-month-rain').style.backgroundColor = '#0D47A1';
         } catch (err) { printLog(`Error: ${err.message}`); }
     }
 
-    // --- PROCESADOR DE COMPARATIVA INTERANUAL MULTIBANDA ---
+    // --- PIPELINE DE EXTRACCIÓN Y REDISTRIBUCIÓN DE EJES COMPARATIVOS ---
     document.getElementById('btn-run-compare').addEventListener('click', async function() {
-        if (!activePixelCoords) { alert("Por favor, seleccione primero un punto geográfico de Costa Rica en el mapa del Tablero Principal."); return; }
+        if (!activePixelCoords) { alert("Seleccione primero un punto geográfico en el mapa del Tablero Principal."); return; }
         const checkedBoxes = document.querySelectorAll('.year-chk:checked');
-        if (checkedBoxes.length === 0) { alert("Debe seleccionar al menos un año de la lista para graficar la tendencia."); return; }
+        if (checkedBoxes.length === 0) { alert("Debe seleccionar al menos un año."); return; }
 
         const selectedYears = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
-        printLog(`Iniciando extracción por bloques LFS para los años: [${selectedYears.join(', ')}]`);
-
-        const yearlySeriesResults = [];
+        printLog(`Descargando e indexando curvas binarias para el pixel...`);
+        globalCompareRawData = [];
 
         for (const year of selectedYears) {
             const fileName = `CHELSA_prec_${year}_stack.tif`;
             const rawUrl = `https://media.githubusercontent.com/media/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${fileName}`;
-
             try {
                 const instance = await GeoTIFF.fromUrl(rawUrl, { forceCSPIsolation: true });
                 const img = await instance.getImage();
                 const rasterData = await img.readRasters({ window: [activePixelCoords.posX, activePixelCoords.posY, activePixelCoords.posX + 1, activePixelCoords.posY + 1], interleave: false });
                 
-                let cumulativeSum = 0;
-                const dailyCurve = [];
-                const totalBands = rasterData.length;
+                let cumulativeSum = 0; const dailyCurve = []; const metaDates = []; const totalBands = rasterData.length;
+                const daysInMonths = getDaysInMonths(year);
+                let currentMonth = 0, currentDay = 1;
 
                 for (let i = 0; i < totalBands; i++) {
                     let v = rasterData[i][0];
-                    if (v !== null && v !== -9999 && !isNaN(v)) {
-                        v = v * 0.1; if (v < 0) v = 0;
-                        cumulativeSum += v;
-                    }
-                    dailyCurve.push(cumulativeSum); 
+                    if (v !== null && v !== -9999 && !isNaN(v)) { v = v * 0.1; if (v < 0) v = 0; cumulativeSum += v; }
+                    dailyCurve.push(cumulativeSum);
+                    metaDates.push({ year, month: currentMonth + 1, day: currentDay, value: v });
+                    
+                    currentDay++;
+                    if (currentDay > daysInMonths[currentMonth]) { currentDay = 1; currentMonth++; }
                 }
-
-                yearlySeriesResults.push({ year: year, totalRain: cumulativeSum, curve: dailyCurve });
-            } catch (err) { printLog(`Error extrayendo año ${year}: ${err.message}`); }
+                globalCompareRawData.push({ year, totalRain: cumulativeSum, curve: dailyCurve, meta: metaDates });
+            } catch (err) { printLog(`Error en año ${year}: ${err.message}`); }
         }
-
-        const totalRainfalls = yearlySeriesResults.map(s => s.totalRain);
-        const maxRainSelected = Math.max(...totalRainfalls);
-        const minRainSelected = Math.min(...totalRainfalls);
-
-        compareChartInstance.data.datasets = yearlySeriesResults.map(series => {
-            const hexColor = getThermalGradientColor(series.totalRain, minRainSelected, maxRainSelected);
-            return {
-                label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
-                data: series.curve,
-                borderColor: hexColor,
-                backgroundColor: 'transparent',
-                borderWidth: 2,
-                tension: 0.1
-            };
-        });
-
-        // Forzar etiquetas usando el año pivote para que el calendario del eje X mantenga regularidad lineal UTC
-        compareChartInstance.data.labels = generateCalendarLabels(selectedYears[0], 365);
-        compareChartInstance.update();
-        printLog("¡Gráfico de tendencias interanuales e hitos lunares actualizado!");
+        renderCompareChart();
     });
+
+    // Remapear estructuras y reconstruir ejes dinámicamente sin llamadas de red
+    function renderCompareChart() {
+        if (globalCompareRawData.length === 0) return;
+        compareXMode = document.getElementById('axis-mode-select').value;
+        
+        const totals = globalCompareRawData.map(s => s.totalRain);
+        const maxRain = Math.max(...totals); const minRain = Math.min(...totals);
+
+        if (compareXMode === "calendar") {
+            // Modo Mes Calendario
+            compareChartInstance.data.labels = generateCalendarLabels(globalCompareRawData[0].year, 365);
+            compareChartInstance.data.datasets = globalCompareRawData.map(series => ({
+                label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
+                data: series.curve.slice(0, 365), borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), backgroundColor: 'transparent', borderWidth: 2, tension: 0.1
+            }));
+            compareChartInstance.options.scales.x.title.text = "Mes del Año";
+        } 
+        else if (compareXMode === "julian") {
+            // Modo Día Juliano
+            compareChartInstance.data.labels = Array.from({length: 365}, (_, i) => `Día ${i + 1}`);
+            compareChartInstance.data.datasets = globalCompareRawData.map(series => ({
+                label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
+                data: series.curve.slice(0, 365), borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), backgroundColor: 'transparent', borderWidth: 2, tension: 0.1
+            }));
+            compareChartInstance.options.scales.x.title.text = "Día Juliano del Año (Contador Continuo)";
+        } 
+        else if (compareXMode === "lunar") {
+            // Modo Mes Lunar (Edad Lunar en el Eje X)
+            // Se agrupan los datos por intervalos discretos de edad lunar de 0 a 29 días
+            const lunarBins = Array.from({length: 30}, (_, i) => i);
+            compareChartInstance.data.labels = lunarBins.map(b => `Día Lunar ${b}`);
+            
+            compareChartInstance.data.datasets = globalCompareRawData.map(series => {
+                const binSums = new Array(30).fill(0);
+                const binCounts = new Array(30).fill(0);
+                
+                series.meta.forEach(dayMeta => {
+                    const lAge = getLunarAge(dayMeta.year, dayMeta.month, dayMeta.day);
+                    const binIdx = Math.floor(lAge) % 30;
+                    binSums[binIdx] += dayMeta.value;
+                    binCounts[binIdx]++;
+                });
+
+                // Curva acumulada ponderada según el ciclo sinódico Meeus
+                let cumLunar = 0;
+                const lunarCurve = binSums.map((val, idx) => {
+                    cumLunar += binCounts[idx] > 0 ? (val / binCounts[idx]) : 0;
+                    return cumLunar;
+                });
+
+                return {
+                    label: `Año ${series.year} (Fase Lunar)`,
+                    data: lunarCurve, borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), backgroundColor: 'transparent', borderWidth: 2, tension: 0.15
+                };
+            });
+            compareChartInstance.options.scales.x.title.text = "Edad de la Luna (0 = Luna Nueva, 14.7 = Luna Llena)";
+        }
+        compareChartInstance.update();
+    }
+
+    // Escuchar el cambio de modo de eje para actualizar al vuelo de forma instantánea
+    document.getElementById('axis-mode-select').addEventListener('change', renderCompareChart);
 
     function printLog(msg) { const consoleEl = document.getElementById('console-log'); consoleEl.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`; consoleEl.scrollTop = consoleEl.scrollHeight; }
     
