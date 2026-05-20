@@ -6,27 +6,142 @@
     <title>Visualizador ENOS Costa Rica - AgriCien</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { --bg-dark: #202020; --container-bg: #2d2d2d; --border-color: #555555; --accent-purple: #9C27B0; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background-color: var(--bg-dark); color: #ffffff; }
-        .dashboard { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px; max-width: 1600px; margin: 0 auto; }
-        @media (max-width: 1000px) { .dashboard { grid-template-columns: 1fr; } }
-        .panel { background: var(--container-bg); border-radius: 8px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 15px; }
-        h2 { margin-top: 0; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; font-size: 13pt; letter-spacing: 0.5px; color: #e0e0e0; }
-        #map { height: 450px; width: 100%; border-radius: 6px; border: 1px solid var(--border-color); background: #151515; }
-        select { width: 100%; padding: 12px; border-radius: 6px; background: #383838; color: white; border: 1px solid var(--border-color); font-size: 11pt; }
-        .result-box { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; display: flex; flex-direction: column; gap: 12px; }
-        #console-log { width: 100%; height: 100px; font-family: 'Courier New', monospace; font-size: 9pt; background: #111111; color: #00ff00; padding: 10px; box-sizing: border-box; border-radius: 4px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #444; }
+        :root { 
+            --bg-dark: #202020; 
+            --container-bg: #2d2d2d; 
+            --border-color: #555555; 
+            --accent-purple: #9C27B0; 
+        }
         
-        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .stat-card { background: #2a2a2a; padding: 10px 12px; border-radius: 6px; border: 1px solid #444; transition: background-color 0.3s, color 0.3s; }
+        * {
+            box-sizing: border-box;
+        }
+
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            margin: 0; 
+            padding: 15px; 
+            background-color: var(--bg-dark); 
+            color: #ffffff; 
+        }
+
+        /* Contenedor adaptativo: Se ajusta sin romper el layout */
+        .dashboard { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); 
+            gap: 20px; 
+            max-width: 1600px; 
+            margin: 0 auto; 
+        }
+        
+        /* Ajuste estricto para pantallas móviles pequeñas */
+        @media (max-width: 500px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* min-width: 0 evita que los contenedores hijos desborden el grid */
+        .panel { 
+            background: var(--container-bg); 
+            border-radius: 8px; 
+            padding: 20px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            min-width: 0; 
+        }
+
+        h2 { 
+            margin-top: 0; 
+            border-bottom: 2px solid var(--border-color); 
+            padding-bottom: 8px; 
+            font-size: 13pt; 
+            letter-spacing: 0.5px; 
+            color: #e0e0e0; 
+        }
+
+        #map { 
+            height: 450px; 
+            width: 100%; 
+            border-radius: 6px; 
+            border: 1px solid var(--border-color); 
+            background: #151515; 
+        }
+
+        select { 
+            width: 100%; 
+            padding: 12px; 
+            border-radius: 6px; 
+            background: #383838; 
+            color: white; 
+            border: 1px solid var(--border-color); 
+            font-size: 11pt; 
+            outline: none;
+        }
+        
+        select:focus {
+            border-color: var(--accent-purple);
+        }
+
+        .result-box { 
+            background: #1e1e1e; 
+            border: 1px solid var(--border-color); 
+            border-radius: 6px; 
+            padding: 15px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 12px; 
+            width: 100%;
+        }
+
+        #console-log { 
+            width: 100%; 
+            height: 100px; 
+            font-family: 'Courier New', monospace; 
+            font-size: 9pt; 
+            background: #111111; 
+            color: #00ff00; 
+            padding: 10px; 
+            border-radius: 4px; 
+            overflow-y: auto; 
+            white-space: pre-wrap; 
+            border: 1px solid #444; 
+        }
+        
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+            gap: 10px; 
+            width: 100%;
+        }
+
+        .stat-card { 
+            background: #2a2a2a; 
+            padding: 10px 12px; 
+            border-radius: 6px; 
+            border: 1px solid #444; 
+            transition: background-color 0.3s, color 0.3s; 
+        }
+
         .stat-card.blue { border-left: 4px solid #1565C0; }
         .stat-card.orange { border-left: 4px solid #E65100; }
         .stat-card.green { border-left: 4px solid #2E7D32; }
         .stat-card.dynamic-blue { border-left: 4px solid #00E5FF; }
         .stat-name { font-size: 8.5pt; color: #b0b0b0; text-transform: uppercase; font-weight: 600; }
-        .stat-val { font-size: 14pt; font-weight: bold; color: #00ff00; margin-top: 4px; }
+        .stat-val { font-size: 13pt; font-weight: bold; color: #00ff00; margin-top: 4px; word-break: break-all; }
         
-        .chart-container { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; position: relative; height: 320px; width: 100%; box-sizing: border-box; }
+        /* Contenedor del Gráfico flexible */
+        .chart-container { 
+            background: #1e1e1e; 
+            border: 1px solid var(--border-color); 
+            border-radius: 6px; 
+            padding: 15px; 
+            position: relative; 
+            height: 320px; 
+            width: 100%; 
+        }
     </style>
 </head>
 <body>
@@ -165,7 +280,7 @@
                 datasets: [{
                     label: 'Precipitación Diaria (mm)',
                     data: [],
-                    backgroundColor: [], // Se llenará dinámicamente con un array de colores por barra
+                    backgroundColor: [], 
                     borderWidth: 0,
                     barPercentage: 1.0,
                     categoryPercentage: 1.0
@@ -174,6 +289,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                resizeDelay: 100, // Retardo de optimización para un redimensionamiento responsivo fluido
                 scales: {
                     x: { 
                         grid: { display: false }, 
@@ -256,14 +372,11 @@
         return labels;
     }
 
-    // Función auxiliar para calcular el color hex interpolado entre celeste (#B3E5FC) y azul oscuro (#0D47A1)
     function getInterpolatedColor(value, min, max) {
-        if (max === min) return '#1565C0'; // Evitar división por cero
+        if (max === min) return '#1565C0'; 
         const ratio = (value - min) / (max - min);
         
-        // RGB de #B3E5FC (Celeste Claro)
         const r1 = 179, g1 = 229, b1 = 252;
-        // RGB de #0D47A1 (Azul Oscuro Profundo)
         const r2 = 13, g2 = 71, b2 = 161;
         
         const r = Math.round(r1 + ratio * (r2 - r1));
@@ -357,7 +470,7 @@
             let daysAccumulatedInCurrentMonth = 0;
             
             const chartDataArray = [];
-            const dayToMonthMapping = []; // Guardará el índice del mes (0-11) para cada uno de los 365 días
+            const dayToMonthMapping = []; 
 
             for (let i = 0; i < totalBands; i++) {
                 let cellVal = rasterData[i][0];
@@ -413,13 +526,10 @@
                 }
             }
 
-            // Generar array dinámico de colores para las barras basado en la lluvia de su mes correspondiente
             const barColorsArray = [];
             for (let i = 0; i < validDays; i++) {
                 const monthOfBar = dayToMonthMapping[i];
                 const rainOfMmonth = monthlyTotals[monthOfBar];
-                
-                // Mapear el color de la barra usando el rango min/max mensual del píxel
                 const interpolatedColor = getInterpolatedColor(rainOfMmonth, minMonthVal, maxMonthVal);
                 barColorsArray.push(interpolatedColor);
             }
@@ -427,13 +537,11 @@
             const promedio = totalAcum / validDays;
             const calendarLabels = generateCalendarLabels(currentYearGlobal, validDays);
 
-            // Cargar datos, etiquetas y la paleta de colores calculada en Chart.js
             dailyChartInstance.data.labels = calendarLabels;
             dailyChartInstance.data.datasets[0].data = chartDataArray;
             dailyChartInstance.data.datasets[0].backgroundColor = barColorsArray;
             dailyChartInstance.update();
 
-            // Renderizado de métricas generales
             document.getElementById('stat-acum').innerText = `${totalAcum.toFixed(1)} mm`;
             document.getElementById('stat-prom').innerText = `${promedio.toFixed(2)} mm/d`;
             document.getElementById('stat-days-rain').innerText = `${countRain} días`;
