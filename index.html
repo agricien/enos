@@ -133,15 +133,14 @@
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-    // Plugin personalizado para forzar el dibujado de líneas verticales en cada lunes detectado
     const mondayLinesPlugin = {
         id: 'mondayLines',
         afterDatasetsDraw(chart) {
             const { ctx, scales: { x, y } } = chart;
             ctx.save();
-            ctx.strokeStyle = 'rgba(3, 169, 244, 0.4)'; // Celeste intermedio para delimitar semanas
+            ctx.strokeStyle = 'rgba(3, 169, 244, 0.4)'; 
             ctx.lineWidth = 1;
-            ctx.setLineDash([3, 3]); // Línea punteada para no saturar visualmente
+            ctx.setLineDash([3, 3]); 
 
             mondayIndicesGlobal.forEach(index => {
                 const meta = chart.getDatasetMeta(0);
@@ -166,7 +165,7 @@
                 datasets: [{
                     label: 'Precipitación Diaria (mm)',
                     data: [],
-                    backgroundColor: '#1565C0',
+                    backgroundColor: [], // Se llenará dinámicamente con un array de colores por barra
                     borderWidth: 0,
                     barPercentage: 1.0,
                     categoryPercentage: 1.0
@@ -177,7 +176,7 @@
                 maintainAspectRatio: false,
                 scales: {
                     x: { 
-                        grid: { display: false }, // Se desactiva la grilla nativa de X para usar el plugin
+                        grid: { display: false }, 
                         ticks: { 
                             color: '#aaa',
                             font: { size: 9 },
@@ -209,7 +208,7 @@
                     }
                 }
             },
-            plugins: [mondayLinesPlugin] // Inyección del plugin de líneas verticales obligatorias
+            plugins: [mondayLinesPlugin]
         });
     }
 
@@ -255,6 +254,23 @@
             dateObj.setDate(dateObj.getDate() + 1);
         }
         return labels;
+    }
+
+    // Función auxiliar para calcular el color hex interpolado entre celeste (#B3E5FC) y azul oscuro (#0D47A1)
+    function getInterpolatedColor(value, min, max) {
+        if (max === min) return '#1565C0'; // Evitar división por cero
+        const ratio = (value - min) / (max - min);
+        
+        // RGB de #B3E5FC (Celeste Claro)
+        const r1 = 179, g1 = 229, b1 = 252;
+        // RGB de #0D47A1 (Azul Oscuro Profundo)
+        const r2 = 13, g2 = 71, b2 = 161;
+        
+        const r = Math.round(r1 + ratio * (r2 - r1));
+        const g = Math.round(g1 + ratio * (g2 - g1));
+        const b = Math.round(b1 + ratio * (b2 - b1));
+        
+        return `rgb(${r}, ${g}, ${b})`;
     }
 
     async function initRemoteTiff(fileName) {
@@ -341,6 +357,7 @@
             let daysAccumulatedInCurrentMonth = 0;
             
             const chartDataArray = [];
+            const dayToMonthMapping = []; // Guardará el índice del mes (0-11) para cada uno de los 365 días
 
             for (let i = 0; i < totalBands; i++) {
                 let cellVal = rasterData[i][0];
@@ -352,6 +369,7 @@
                     totalAcum += cellVal;
                     validDays++;
                     chartDataArray.push(cellVal);
+                    dayToMonthMapping.push(currentMonthIdx);
 
                     if (cellVal === 0) {
                         countDry++;
@@ -395,12 +413,24 @@
                 }
             }
 
-            const promedio = totalAcum / validDays;
+            // Generar array dinámico de colores para las barras basado en la lluvia de su mes correspondiente
+            const barColorsArray = [];
+            for (let i = 0; i < validDays; i++) {
+                const monthOfBar = dayToMonthMapping[i];
+                const rainOfMmonth = monthlyTotals[monthOfBar];
+                
+                // Mapear el color de la barra usando el rango min/max mensual del píxel
+                const interpolatedColor = getInterpolatedColor(rainOfMmonth, minMonthVal, maxMonthVal);
+                barColorsArray.push(interpolatedColor);
+            }
 
+            const promedio = totalAcum / validDays;
             const calendarLabels = generateCalendarLabels(currentYearGlobal, validDays);
 
+            // Cargar datos, etiquetas y la paleta de colores calculada en Chart.js
             dailyChartInstance.data.labels = calendarLabels;
             dailyChartInstance.data.datasets[0].data = chartDataArray;
+            dailyChartInstance.data.datasets[0].backgroundColor = barColorsArray;
             dailyChartInstance.update();
 
             // Renderizado de métricas generales
@@ -411,26 +441,24 @@
             document.getElementById('stat-streak-dry').innerText = `${maxDryStreak} días seguidos`;
             document.getElementById('stat-streak-rain').innerText = `${maxRainStreak} días seguidos`;
             
-            // Renderizado y Coloreo dinámico de tarjetas (Gama Celeste a Azul Oscuro)
             const cardDry = document.getElementById('card-month-dry');
             const cardRain = document.getElementById('card-month-rain');
             
             document.getElementById('stat-month-dry').innerText = `${MONTH_NAMES[worstMonthIdx]} (${minMonthVal.toFixed(1)} mm)`;
             document.getElementById('stat-month-rain').innerText = `${MONTH_NAMES[bestMonthIdx]} (${maxMonthVal.toFixed(1)} mm)`;
             
-            // Asignación de colores de la gama solicitada
-            cardDry.style.backgroundColor = '#B3E5FC'; // Celeste claro para el mes menos lluvioso
-            cardDry.style.color = '#0277BD'; // Texto azul contrastante para legibilidad
+            cardDry.style.backgroundColor = '#B3E5FC'; 
+            cardDry.style.color = '#0277BD'; 
             document.getElementById('label-month-dry').style.color = '#0277BD';
             document.getElementById('stat-month-dry').style.color = '#01579B';
 
-            cardRain.style.backgroundColor = '#0D47A1'; // Azul oscuro profundo para el mes más lluvioso
+            cardRain.style.backgroundColor = '#0D47A1'; 
             cardRain.style.color = '#FFFFFF';
             document.getElementById('label-month-rain').style.color = '#E3F2FD';
-            document.getElementById('stat-month-rain').style.color = '#00E5FF'; // Valor resaltado en cian brillante
+            document.getElementById('stat-month-rain').style.color = '#00E5FF'; 
             
             document.getElementById('raster-bands-info').innerText = `Procesamiento exitoso: ${validDays} capas analizadas de forma síncrona.`;
-            printLog(`Análisis estadístico y gráfico de barras diario completados.`);
+            printLog(`Análisis estadístico y gráfico cromático multibanda completados.`);
 
         } catch (err) {
             printLog(`Error al procesar series de tiempo: ${err.message}`);
@@ -461,6 +489,7 @@
         if (dailyChartInstance) {
             dailyChartInstance.data.labels = [];
             dailyChartInstance.data.datasets[0].data = [];
+            dailyChartInstance.data.datasets[0].backgroundColor = [];
             dailyChartInstance.update();
         }
     }
