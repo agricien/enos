@@ -38,10 +38,10 @@
     </div>
 
     <div class="panel">
-        <h2>2. Análisis Estadístico del Píxel (Matriz de 365/366 días)</h2>
+        <h2>2. Análisis Estadístico del Píxel (Factor de Escala 0.1 Aplicado)</h2>
         <div id="click-coords" style="color: #aaa;">Coordenadas: Seleccione un punto en el mapa de Costa Rica...</div>
         <div class="result-box">
-            <div style="font-weight: bold; color: #ccc; margin-bottom: 5px;">Métricas calculadas para la celda seleccionada:</div>
+            <div style="font-weight: bold; color: #ccc; margin-bottom: 5px;">Métricas calibradas para la celda seleccionada:</div>
             <div class="stats-grid">
                 <div class="stat-card blue">
                     <div class="stat-name">Σ Acumulado Anual</div>
@@ -96,6 +96,9 @@
             opt.text = `Año ${y} (Daily Stack)`;
             selectEl.appendChild(opt);
         });
+        
+        // Seleccionar 2015 por defecto para verificación del evento ENOS
+        selectEl.value = "CHELSA_prec_2015_stack.tif";
         initRemoteTiff(selectEl.value);
     }
 
@@ -103,11 +106,9 @@
         if (!fileName) return;
         printLog(`Conectando al stream binario via GitHub LFS Gateway...`);
         
-        // URL modificada para forzar el bypass del puntero de texto LFS de forma estricta
         const rawUrl = `https://media.githubusercontent.com/media/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${fileName}`;
 
         try {
-            // Desactivar decodificadores dinámicos web workers para evitar conflictos con la Content Security Policy (CSP)
             tiffInstance = await GeoTIFF.fromUrl(rawUrl, { forceCSPIsolation: true });
             tiffImage = await tiffInstance.getImage();
 
@@ -116,7 +117,6 @@
             rasterBounds = tiffImage.getBoundingBox();
 
             printLog(`¡Cabecera GeoTIFF decodificada con éxito!`);
-            printLog(`Matriz diaria detectada: ${rasterWidth} x ${rasterHeight}`);
 
             if (currentBBoxLayer) map.removeLayer(currentBBoxLayer);
             const boundsLeaflet = [[rasterBounds[1], rasterBounds[0]], [rasterBounds[3], rasterBounds[2]]];
@@ -152,7 +152,6 @@
         printLog(`Calculando índices matriciales: Columna ${posX}, Fila ${posY}...`);
 
         try {
-            // Forzar lectura sin usar compilación interna dinámica (eval-free)
             const rasterData = await tiffImage.readRasters({ 
                 window: [posX, posY, posX + 1, posY + 1],
                 interleave: false
@@ -164,10 +163,16 @@
             let minVal = Infinity;
             let validDays = 0;
 
+            // Constante del factor de escala oficial de CHELSA Prec (v2.1)
+            const CHELSA_SCALE_FACTOR = 0.1;
+
             for (let i = 0; i < totalBands; i++) {
-                const cellVal = rasterData[i][0];
+                let cellVal = rasterData[i][0];
                 
                 if (cellVal !== null && cellVal !== -9999 && !isNaN(cellVal) && cellVal >= 0) {
+                    // Aplicar el factor de escala decimal antes del cálculo estadístico
+                    cellVal = cellVal * CHELSA_SCALE_FACTOR;
+
                     totalAcum += cellVal;
                     if (cellVal > maxVal) maxVal = cellVal;
                     if (cellVal < minVal) minVal = cellVal;
@@ -187,7 +192,7 @@
             document.getElementById('stat-prom').innerText = `${promedio.toFixed(2)} mm/d`;
             document.getElementById('stat-max').innerText = `${maxVal.toFixed(2)} mm`;
             document.getElementById('stat-min').innerText = `${minVal.toFixed(2)} mm`;
-            document.getElementById('raster-bands-info').innerText = `Serie procesada: ${validDays} días analizados de forma síncrona.`;
+            document.getElementById('raster-bands-info').innerText = `Serie procesada: ${validDays} días analizados con factor de escala 0.1`;
 
             printLog(`Extracción temporal de la grilla diaria completada.`);
         } catch (err) {
