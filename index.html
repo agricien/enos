@@ -18,11 +18,11 @@
         #console-log { width: 100%; height: 100px; font-family: 'Courier New', monospace; font-size: 9pt; background: #111111; color: #00ff00; padding: 10px; box-sizing: border-box; border-radius: 4px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #444; }
         
         .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .stat-card { background: #2a2a2a; padding: 10px 12px; border-radius: 6px; border: 1px solid #444; }
+        .stat-card { background: #2a2a2a; padding: 10px 12px; border-radius: 6px; border: 1px solid #444; transition: background-color 0.3s, color 0.3s; }
         .stat-card.blue { border-left: 4px solid #1565C0; }
         .stat-card.orange { border-left: 4px solid #E65100; }
         .stat-card.green { border-left: 4px solid #2E7D32; }
-        .stat-card.purple { border-left: 4px solid #6A1B9A; }
+        .stat-card.dynamic-blue { border-left: 4px solid #00E5FF; }
         .stat-name { font-size: 8.5pt; color: #b0b0b0; text-transform: uppercase; font-weight: 600; }
         .stat-val { font-size: 14pt; font-weight: bold; color: #00ff00; margin-top: 4px; }
         
@@ -88,12 +88,12 @@
 
             <h3 style="margin: 5px 0 0 0; font-size: 10.5pt; color: #888; border-bottom: 1px solid #333; padding-bottom: 4px;">Estacionalidad Mensual Agregada</h3>
             <div class="stats-grid">
-                <div class="stat-card purple">
-                    <div class="stat-name">Mes Más Seco</div>
+                <div class="stat-card dynamic-blue" id="card-month-dry">
+                    <div class="stat-name" id="label-month-dry">Mes Más Seco</div>
                     <div class="stat-val" id="stat-month-dry">—</div>
                 </div>
-                <div class="stat-card purple">
-                    <div class="stat-name">Mes Más Lluvioso</div>
+                <div class="stat-card dynamic-blue" id="card-month-rain">
+                    <div class="stat-name" id="label-month-rain">Mes Más Lluvioso</div>
                     <div class="stat-val" id="stat-month-rain">—</div>
                 </div>
             </div>
@@ -129,10 +129,33 @@
     let currentYearGlobal = 2015;
     let dailyChartInstance = null;
     
-    // Almacena qué índices del eje X corresponden a un Lunes
     let mondayIndicesGlobal = [];
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+    // Plugin personalizado para forzar el dibujado de líneas verticales en cada lunes detectado
+    const mondayLinesPlugin = {
+        id: 'mondayLines',
+        afterDatasetsDraw(chart) {
+            const { ctx, scales: { x, y } } = chart;
+            ctx.save();
+            ctx.strokeStyle = 'rgba(3, 169, 244, 0.4)'; // Celeste intermedio para delimitar semanas
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]); // Línea punteada para no saturar visualmente
+
+            mondayIndicesGlobal.forEach(index => {
+                const meta = chart.getDatasetMeta(0);
+                if (meta.data[index]) {
+                    const xPos = meta.data[index].x;
+                    ctx.beginPath();
+                    ctx.moveTo(xPos, y.top);
+                    ctx.lineTo(xPos, y.bottom);
+                    ctx.stroke();
+                }
+            });
+            ctx.restore();
+        }
+    };
 
     function initChart() {
         const ctx = document.getElementById('dailyChart').getContext('2d');
@@ -154,28 +177,15 @@
                 maintainAspectRatio: false,
                 scales: {
                     x: { 
-                        grid: { 
-                            display: true,
-                            color: function(context) {
-                                // Dibuja una línea vertical visible únicamente si el índice del día corresponde a un lunes
-                                if (mondayIndicesGlobal.includes(context.index)) {
-                                    return 'rgba(156, 39, 176, 0.4)'; // Color fucsia/púrpura tenue para delimitar semanas
-                                }
-                                return 'transparent';
-                            },
-                            lineWidth: function(context) {
-                                return mondayIndicesGlobal.includes(context.index) ? 1.5 : 0;
-                            }
-                        },
+                        grid: { display: false }, // Se desactiva la grilla nativa de X para usar el plugin
                         ticks: { 
                             color: '#aaa',
                             font: { size: 9 },
                             maxRotation: 45,
                             autoSkip: false,
                             callback: function(val, index) {
-                                // Para no saturar el eje, mostramos la etiqueta del mes solo en días estratégicos o cambios de mes
                                 const label = this.getLabelForValue(val);
-                                if (label && label.endsWith("-01") || label.endsWith("-15")) {
+                                if (label && (label.endsWith("-01") || label.endsWith("-15"))) {
                                     const parts = label.split('-');
                                     const monthIdx = parseInt(parts[1]) - 1;
                                     return label.endsWith("-01") ? SHORT_MONTHS[monthIdx] : parts[2];
@@ -194,13 +204,12 @@
                     legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            title: function(context) {
-                                return `Fecha: ${context[0].label}`;
-                            }
+                            title: function(context) { return `Fecha: ${context[0].label}`; }
                         }
                     }
                 }
-            }
+            },
+            plugins: [mondayLinesPlugin] // Inyección del plugin de líneas verticales obligatorias
         });
     }
 
@@ -228,12 +237,9 @@
         return [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     }
 
-    // Genera un mapeo completo del calendario y detecta cuáles índices de la serie temporal son lunes
     function generateCalendarLabels(year, totalBands) {
         const labels = [];
         mondayIndicesGlobal = [];
-        
-        // Creamos un objeto de fecha inicializado el 1 de enero del año correspondiente
         let dateObj = new Date(year, 0, 1);
         
         for (let i = 0; i < totalBands; i++) {
@@ -243,12 +249,9 @@
             
             labels.push(`${yyyy}-${mm}-${dd}`);
             
-            // Javascript Date.getDay() retorna 1 para Lunes
             if (dateObj.getDay() === 1) {
                 mondayIndicesGlobal.push(i);
             }
-            
-            // Avanzar un día
             dateObj.setDate(dateObj.getDate() + 1);
         }
         return labels;
@@ -394,23 +397,37 @@
 
             const promedio = totalAcum / validDays;
 
-            // Generar etiquetas del calendario reales y calcular índices de los lunes
             const calendarLabels = generateCalendarLabels(currentYearGlobal, validDays);
 
-            // Inyectar datos al gráfico y refrescarlo
             dailyChartInstance.data.labels = calendarLabels;
             dailyChartInstance.data.datasets[0].data = chartDataArray;
             dailyChartInstance.update();
 
-            // Renderizado de métricas avanzadas en el Dashboard
+            // Renderizado de métricas generales
             document.getElementById('stat-acum').innerText = `${totalAcum.toFixed(1)} mm`;
             document.getElementById('stat-prom').innerText = `${promedio.toFixed(2)} mm/d`;
             document.getElementById('stat-days-rain').innerText = `${countRain} días`;
             document.getElementById('stat-days-dry').innerText = `${countDry} días`;
             document.getElementById('stat-streak-dry').innerText = `${maxDryStreak} días seguidos`;
             document.getElementById('stat-streak-rain').innerText = `${maxRainStreak} días seguidos`;
+            
+            // Renderizado y Coloreo dinámico de tarjetas (Gama Celeste a Azul Oscuro)
+            const cardDry = document.getElementById('card-month-dry');
+            const cardRain = document.getElementById('card-month-rain');
+            
             document.getElementById('stat-month-dry').innerText = `${MONTH_NAMES[worstMonthIdx]} (${minMonthVal.toFixed(1)} mm)`;
             document.getElementById('stat-month-rain').innerText = `${MONTH_NAMES[bestMonthIdx]} (${maxMonthVal.toFixed(1)} mm)`;
+            
+            // Asignación de colores de la gama solicitada
+            cardDry.style.backgroundColor = '#B3E5FC'; // Celeste claro para el mes menos lluvioso
+            cardDry.style.color = '#0277BD'; // Texto azul contrastante para legibilidad
+            document.getElementById('label-month-dry').style.color = '#0277BD';
+            document.getElementById('stat-month-dry').style.color = '#01579B';
+
+            cardRain.style.backgroundColor = '#0D47A1'; // Azul oscuro profundo para el mes más lluvioso
+            cardRain.style.color = '#FFFFFF';
+            document.getElementById('label-month-rain').style.color = '#E3F2FD';
+            document.getElementById('stat-month-rain').style.color = '#00E5FF'; // Valor resaltado en cian brillante
             
             document.getElementById('raster-bands-info').innerText = `Procesamiento exitoso: ${validDays} capas analizadas de forma síncrona.`;
             printLog(`Análisis estadístico y gráfico de barras diario completados.`);
@@ -429,6 +446,16 @@
         document.getElementById('stat-streak-rain').innerText = "—";
         document.getElementById('stat-month-dry').innerText = "—";
         document.getElementById('stat-month-rain').innerText = "—";
+        
+        const cardDry = document.getElementById('card-month-dry');
+        const cardRain = document.getElementById('card-month-rain');
+        cardDry.style.backgroundColor = '#2a2a2a'; cardDry.style.color = '#fff';
+        cardRain.style.backgroundColor = '#2a2a2a'; cardRain.style.color = '#fff';
+        document.getElementById('label-month-dry').style.color = '#b0b0b0';
+        document.getElementById('stat-month-dry').style.color = '#00ff00';
+        document.getElementById('label-month-rain').style.color = '#b0b0b0';
+        document.getElementById('stat-month-rain').style.color = '#00ff00';
+
         document.getElementById('raster-bands-info').innerText = "";
         mondayIndicesGlobal = [];
         if (dailyChartInstance) {
