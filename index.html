@@ -73,7 +73,7 @@
         
         .chart-container { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; position: relative; height: 340px; width: 100%; }
 
-        .checkbox-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; max-height: 150px; overflow-y: auto; background: #1e1e1e; padding: 15px; border-radius: 6px; border: 1px solid var(--border-color); }
+        .checkbox-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; max-height: 120px; overflow-y: auto; background: #1e1e1e; padding: 15px; border-radius: 6px; border: 1px solid var(--border-color); }
         .checkbox-item { display: flex; align-items: center; gap: 8px; font-size: 10pt; cursor: pointer; }
         .checkbox-item input { cursor: pointer; width: 16px; height: 16px; accent-color: var(--accent-purple); }
 
@@ -88,6 +88,9 @@
         .modal-meta-val { color: #ffffff; font-size: 10pt; }
         .modal-meta-val a { color: #00E5FF; text-decoration: none; }
         .btn-close-modal { position: absolute; top: 15px; right: 15px; background: none; border: none; color: #aaa; font-size: 16pt; cursor: pointer; }
+        
+        .controls-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; }
+        @media (max-width: 600px) { .controls-row { grid-template-columns: 1fr; gap: 10px; } }
     </style>
 </head>
 <body>
@@ -177,18 +180,25 @@
         <h2>1. Selección de Coberturas para Comparación</h2>
         <div class="checkbox-container" id="compare-checkboxes"></div>
         
-        <div style="margin-top: 5px;">
-            <label for="axis-mode-select" style="font-size: 9pt; color: #aaa; display:block; margin-bottom:5px;">Estructura del Eje X:</label>
-            <select id="axis-mode-select">
-                <option value="calendar">Mes Calendario (Semanas Divididas)</option>
-                <option value="julian">Día Juliano (Contador Continuo)</option>
-                <option value="lunar">Mes Lunar (Progreso de la Edad Lunar)</option>
-            </select>
+        <div class="controls-row">
+            <div>
+                <label for="axis-mode-select" style="font-size: 9pt; color: #aaa; display:block; margin-bottom:5px;">Estructura del Eje X:</label>
+                <select id="axis-mode-select">
+                    <option value="calendar">Mes Calendario (Semanas Divididas)</option>
+                    <option value="julian">Día Juliano (Contador Continuo)</option>
+                    <option value="lunar">Mes Lunar (Progreso de la Edad Lunar)</option>
+                </select>
+            </div>
+            <div>
+                <label for="moving-average-select" style="font-size: 9pt; color: #aaa; display:block; margin-bottom:5px;">Media Móvil Simple:</label>
+                <select id="moving-average-select">
+                    </select>
+            </div>
         </div>
         <button class="btn-action" id="btn-run-compare" style="margin-top: 5px;">Graficar Comparativa</button>
     </div>
     <div class="panel">
-        <h2>2. Tendencia Interanual Combinada (Fases Lunares Señaladas)</h2>
+        <h2>2. Tendencia Interanual Combinada (Valores Diarios)</h2>
         <div class="chart-container" style="height: 420px;">
             <canvas id="compareChart"></canvas>
         </div>
@@ -243,8 +253,8 @@
     let dailyChartInstance = null;
     let compareChartInstance = null;
     let mondayIndicesGlobal = [];
-    let compareXMode = "calendar"; // Opciones: calendar, julian, lunar
-    let globalCompareRawData = []; // Buffer de almacenamiento para alternar ejes al vuelo sin re-descargar tifs
+    let compareXMode = "calendar"; 
+    let globalCompareRawData = []; // Buffer de memoria para evitar re-descargas en red
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
@@ -266,7 +276,6 @@
             const { ctx, scales: { x, y } } = chart;
             ctx.save();
 
-            // Evaluar si corresponde dibujar líneas de lunes (Solo en modo Mes Calendario)
             const isCompareChart = chart.canvas.id === "compareChart";
             const showGridLines = !isCompareChart || (isCompareChart && compareXMode === "calendar");
 
@@ -281,7 +290,6 @@
                 });
             }
 
-            // Marcado inteligente de lunas llenas en curvas temporales
             chart.data.datasets.forEach((dataset, datasetIdx) => {
                 const meta = chart.getDatasetMeta(datasetIdx);
                 if (!meta.hidden && meta.data.length > 0) {
@@ -296,10 +304,9 @@
                                 const parts = label.split('-');
                                 if (parts.length === 3) { currentYear = parseInt(parts[0]); currentMonth = parseInt(parts[1]); currentDay = parseInt(parts[2]); }
                             } else if (compareXMode === "julian") {
-                                // Mapeo inverso de día juliano a componentes gregorianos para Meeus
                                 let dateFromJulian = new Date(Date.UTC(currentYear, 0, idx + 1));
                                 currentMonth = dateFromJulian.getUTCMonth() + 1; currentDay = dateFromJulian.getUTCDate();
-                            } else { return; } // En modo puramente lunar el eje X ya representa la luna, no requiere puntos flotantes
+                            } else { return; } 
                         } else {
                             const parts = label.split('-');
                             if (parts.length === 3) { currentYear = parseInt(parts[0]); currentMonth = parseInt(parts[1]); currentDay = parseInt(parts[2]); }
@@ -324,7 +331,6 @@
         }
     };
 
-    // Navegación de pestañas
     document.querySelectorAll('.btn-nav').forEach(btn => {
         btn.addEventListener('click', function() {
             if (this.id === 'openAbout') return;
@@ -364,7 +370,7 @@
             data: { labels: [], datasets: [] },
             options: {
                 responsive: true, maintainAspectRatio: false, resizeDelay: 100,
-                elements: { point: { radius: 0, hoverRadius: 4 } }, 
+                elements: { point: { radius: 0, hoverRadius: 4 }, line: { borderWidth: 2, fill: false } }, 
                 scales: {
                     x: { 
                         grid: { color: '#333' }, 
@@ -380,7 +386,7 @@
                             }
                         } 
                     },
-                    y: { grid: { color: '#444' }, title: { display: true, text: 'Precipitación Acumulada Diaria (mm)', color: '#aaa' }, ticks: { color: '#aaa' } }
+                    y: { grid: { color: '#444' }, title: { display: true, text: 'Precipitación Diaria (mm/día)', color: '#aaa' }, ticks: { color: '#aaa' } }
                 },
                 plugins: { 
                     legend: { display: true, labels: { color: '#fff', font: { size: 10 } } },
@@ -394,6 +400,16 @@
     function setupSelectorAndCheckboxes() {
         const selectEl = document.getElementById('layer-select');
         const checkContainer = document.getElementById('compare-checkboxes');
+        const mvSelect = document.getElementById('moving-average-select');
+
+        // Llenar selector de media móvil de 1 a 30 días
+        for(let d=1; d<=30; d++) {
+            const optMv = document.createElement('option');
+            optMv.value = d;
+            optMv.text = d === 1 ? "Sin filtro (1 Día)" : `${d} Días`;
+            mvSelect.appendChild(optMv);
+        }
+
         YEARS.forEach(y => {
             const opt = document.createElement('option'); opt.value = `CHELSA_prec_${y}_stack.tif`; opt.text = `Año ${y} (Daily Stack)`; selectEl.appendChild(opt);
             const label = document.createElement('label'); label.className = 'checkbox-item'; label.innerHTML = `<input type="checkbox" value="${y}" class="year-chk"> ${y}`; checkContainer.appendChild(label);
@@ -435,6 +451,25 @@
         else if (ratio > 0.25) { const seg = (ratio - 0.25) / 0.25; r = 255; g = Math.round(200 * seg + 100 * (1 - seg)); b = 0; }
         else { const seg = ratio / 0.25; r = 255; g = Math.round(100 * seg); b = 0; }
         return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    // Algoritmo matemático para calcular la media móvil simple en vectores de una sola dimensión
+    function applyMovingAverage(dataArray, windowSize) {
+        if (windowSize <= 1) return dataArray;
+        const smoothed = [];
+        for (let i = 0; i < dataArray.length; i++) {
+            let sum = 0;
+            let count = 0;
+            // Ventana móvil centrada hacia atrás para mantener coherencia temporal estricta
+            for (let j = 0; j < windowSize; j++) {
+                if (i - j >= 0) {
+                    sum += dataArray[i - j];
+                    count++;
+                }
+            }
+            smoothed.push(count > 0 ? sum / count : 0);
+        }
+        return smoothed;
     }
 
     async function initRemoteTiff(fileName) {
@@ -508,14 +543,14 @@
         } catch (err) { printLog(`Error: ${err.message}`); }
     }
 
-    // --- PIPELINE DE EXTRACCIÓN Y REDISTRIBUCIÓN DE EJES COMPARATIVOS ---
+    // --- SUBPANEL: PIPELINE DE COMPARACIÓN INTERANUAL DIARIA ---
     document.getElementById('btn-run-compare').addEventListener('click', async function() {
         if (!activePixelCoords) { alert("Seleccione primero un punto geográfico en el mapa del Tablero Principal."); return; }
         const checkedBoxes = document.querySelectorAll('.year-chk:checked');
         if (checkedBoxes.length === 0) { alert("Debe seleccionar al menos un año."); return; }
 
         const selectedYears = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
-        printLog(`Descargando e indexando curvas binarias para el pixel...`);
+        printLog(`Sincronizando bloques remotos GeoTIFF LFS...`);
         globalCompareRawData = [];
 
         for (const year of selectedYears) {
@@ -526,54 +561,68 @@
                 const img = await instance.getImage();
                 const rasterData = await img.readRasters({ window: [activePixelCoords.posX, activePixelCoords.posY, activePixelCoords.posX + 1, activePixelCoords.posY + 1], interleave: false });
                 
-                let cumulativeSum = 0; const dailyCurve = []; const metaDates = []; const totalBands = rasterData.length;
+                let cumulativeSum = 0; 
+                const dailyRainArray = []; // Almacena el valor diario puro de lluvia por banda
+                const metaDates = []; 
+                const totalBands = rasterData.length;
                 const daysInMonths = getDaysInMonths(year);
                 let currentMonth = 0, currentDay = 1;
 
                 for (let i = 0; i < totalBands; i++) {
                     let v = rasterData[i][0];
-                    if (v !== null && v !== -9999 && !isNaN(v)) { v = v * 0.1; if (v < 0) v = 0; cumulativeSum += v; }
-                    dailyCurve.push(cumulativeSum);
+                    if (v !== null && v !== -9999 && !isNaN(v)) { 
+                        v = v * 0.1; 
+                        if (v < 0) v = 0; 
+                        cumulativeSum += v; 
+                    }
+                    dailyRainArray.push(v); // CORRECCIÓN: Guardar el valor diario, no el acumulativo
                     metaDates.push({ year, month: currentMonth + 1, day: currentDay, value: v });
                     
                     currentDay++;
                     if (currentDay > daysInMonths[currentMonth]) { currentDay = 1; currentMonth++; }
                 }
-                globalCompareRawData.push({ year, totalRain: cumulativeSum, curve: dailyCurve, meta: metaDates });
+                globalCompareRawData.push({ year, totalRain: cumulativeSum, dailyValues: dailyRainArray, meta: metaDates });
             } catch (err) { printLog(`Error en año ${year}: ${err.message}`); }
         }
         renderCompareChart();
     });
 
-    // Remapear estructuras y reconstruir ejes dinámicamente sin llamadas de red
     function renderCompareChart() {
         if (globalCompareRawData.length === 0) return;
         compareXMode = document.getElementById('axis-mode-select').value;
+        const mvSize = parseInt(document.getElementById('moving-average-select').value);
         
         const totals = globalCompareRawData.map(s => s.totalRain);
         const maxRain = Math.max(...totals); const minRain = Math.min(...totals);
 
         if (compareXMode === "calendar") {
-            // Modo Mes Calendario
             compareChartInstance.data.labels = generateCalendarLabels(globalCompareRawData[0].year, 365);
-            compareChartInstance.data.datasets = globalCompareRawData.map(series => ({
-                label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
-                data: series.curve.slice(0, 365), borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), backgroundColor: 'transparent', borderWidth: 2, tension: 0.1
-            }));
+            compareChartInstance.data.datasets = globalCompareRawData.map(series => {
+                // Aplicar suavizado por media móvil sobre la serie de valores diarios
+                const smoothedData = applyMovingAverage(series.dailyValues.slice(0, 365), mvSize);
+                return {
+                    label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
+                    data: smoothedData, 
+                    borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), 
+                    backgroundColor: 'transparent', tension: 0.15
+                };
+            });
             compareChartInstance.options.scales.x.title.text = "Mes del Año";
         } 
         else if (compareXMode === "julian") {
-            // Modo Día Juliano
             compareChartInstance.data.labels = Array.from({length: 365}, (_, i) => `Día ${i + 1}`);
-            compareChartInstance.data.datasets = globalCompareRawData.map(series => ({
-                label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
-                data: series.curve.slice(0, 365), borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), backgroundColor: 'transparent', borderWidth: 2, tension: 0.1
-            }));
-            compareChartInstance.options.scales.x.title.text = "Día Juliano del Año (Contador Continuo)";
+            compareChartInstance.data.datasets = globalCompareRawData.map(series => {
+                const smoothedData = applyMovingAverage(series.dailyValues.slice(0, 365), mvSize);
+                return {
+                    label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
+                    data: smoothedData, 
+                    borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), 
+                    backgroundColor: 'transparent', tension: 0.15
+                };
+            });
+            compareChartInstance.options.scales.x.title.text = "Día Juliano del Año";
         } 
         else if (compareXMode === "lunar") {
-            // Modo Mes Lunar (Edad Lunar en el Eje X)
-            // Se agrupan los datos por intervalos discretos de edad lunar de 0 a 29 días
             const lunarBins = Array.from({length: 30}, (_, i) => i);
             compareChartInstance.data.labels = lunarBins.map(b => `Día Lunar ${b}`);
             
@@ -588,16 +637,14 @@
                     binCounts[binIdx]++;
                 });
 
-                // Curva acumulada ponderada según el ciclo sinódico Meeus
-                let cumLunar = 0;
-                const lunarCurve = binSums.map((val, idx) => {
-                    cumLunar += binCounts[idx] > 0 ? (val / binCounts[idx]) : 0;
-                    return cumLunar;
-                });
+                const rawLunarCurve = binSums.map((val, idx) => binCounts[idx] > 0 ? (val / binCounts[idx]) : 0);
+                const smoothedLunarCurve = applyMovingAverage(rawLunarCurve, mvSize);
 
                 return {
-                    label: `Año ${series.year} (Fase Lunar)`,
-                    data: lunarCurve, borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), backgroundColor: 'transparent', borderWidth: 2, tension: 0.15
+                    label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
+                    data: smoothedLunarCurve, 
+                    borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), 
+                    backgroundColor: 'transparent', tension: 0.15
                 };
             });
             compareChartInstance.options.scales.x.title.text = "Edad de la Luna (0 = Luna Nueva, 14.7 = Luna Llena)";
@@ -605,8 +652,9 @@
         compareChartInstance.update();
     }
 
-    // Escuchar el cambio de modo de eje para actualizar al vuelo de forma instantánea
+    // Escuchadores de eventos para recalcular ejes y medias móviles al vuelo de manera local
     document.getElementById('axis-mode-select').addEventListener('change', renderCompareChart);
+    document.getElementById('moving-average-select').addEventListener('change', renderCompareChart);
 
     function printLog(msg) { const consoleEl = document.getElementById('console-log'); consoleEl.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`; consoleEl.scrollTop = consoleEl.scrollHeight; }
     
