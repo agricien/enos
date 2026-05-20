@@ -38,7 +38,6 @@
         .btn-nav { background: #383838; color: white; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; font-size: 10pt; font-weight: 600; cursor: pointer; transition: all 0.2s; }
         .btn-nav:hover, .btn-nav.active { background: var(--accent-purple); border-color: var(--accent-purple); }
 
-        /* Vistas virtuales (Tabs) */
         .tab-view { display: none; }
         .tab-view.active { display: grid; }
 
@@ -74,12 +73,10 @@
         
         .chart-container { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; position: relative; height: 340px; width: 100%; }
 
-        /* Contenedor Checkboxes Comparativa */
         .checkbox-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; max-height: 180px; overflow-y: auto; background: #1e1e1e; padding: 15px; border-radius: 6px; border: 1px solid var(--border-color); }
         .checkbox-item { display: flex; align-items: center; gap: 8px; font-size: 10pt; cursor: pointer; }
         .checkbox-item input { cursor: pointer; width: 16px; height: 16px; accent-color: var(--accent-purple); }
 
-        /* Estilos Ventana Modal */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.75); display: flex; justify-content: center; align-items: center; z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
         .modal-overlay.active { opacity: 1; pointer-events: auto; }
         .modal-content { background: var(--container-bg); border: 1px solid var(--border-color); padding: 25px; border-radius: 8px; max-width: 500px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.6); position: relative; }
@@ -226,7 +223,6 @@
     const MONTH_NAMES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const SHORT_MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-    // Variables de Estado Espacial Global
     const map = L.map('map').setView([9.6, -84.0], 8);
     let activeMarker = null;
     let tiffImage = null;
@@ -234,17 +230,15 @@
     let rasterWidth = 0, rasterHeight = 0;
     let boundsConfigured = false; 
     let currentYearGlobal = 2015;
-    let activePixelCoords = null; // Guarda {posX, posY} del último clic válido
+    let activePixelCoords = null; 
 
-    // Instancias de Gráficos
     let dailyChartInstance = null;
     let compareChartInstance = null;
     let mondayIndicesGlobal = [];
-    let fullMoonIndicesGlobal = []; // Índices donde ocurre luna llena en la serie actual
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-    // --- ALGORITMO ANALÍTICO DE MEEUS (FASE LUNAR) ---
+    // --- ALGORITMO DE MEEUS FIJO PARA EVITAR SALTOS DE DÍA ---
     function getLunarAge(year, month, day) {
         let Y = year;
         let M = month;
@@ -263,10 +257,10 @@
         let F = (D / 29.530589) % 1;
         if (F < 0) F += 1;
         
-        return F * 29.530589; // Edad de la luna en días
+        return F * 29.530589; 
     }
 
-    // --- PLUGIN PERSONALIZADO PARA DIBUJAR LUNAS LLENAS Y LUNES ---
+    // --- PLUGIN DEL CANVAS: COMPENSACIÓN CRÍTICA DE FECHAS ---
     const climateAstroPlugin = {
         id: 'climateAstroPlugin',
         afterDatasetsDraw(chart) {
@@ -287,26 +281,31 @@
                 });
             }
 
-            // 2. Dibujar Iconos de Luna Llena en gráficos de Línea/Barras
+            // 2. Dibujar una Sola Luna Llena Astronómica Real por mes (Bypass a duplicados locales)
             chart.data.datasets.forEach((dataset, datasetIdx) => {
                 const meta = chart.getDatasetMeta(datasetIdx);
-                // Solo renderizar si el dataset tiene puntos visibles asignados
                 if (!meta.hidden && meta.data.length > 0) {
+                    let lastMarkedMonthKey = ""; // Almacena "AÑO-MES" para evitar marcas múltiples el mismo mes
+
                     chart.data.labels.forEach((label, idx) => {
                         if (!label) return;
                         const parts = label.split('-');
                         if (parts.length !== 3) return;
                         
-                        const lAge = getLunarAge(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
+                        const currentYear = parseInt(parts[0]);
+                        const currentMonth = parseInt(parts[1]);
+                        const currentDay = parseInt(parts[2]);
+                        const monthKey = `${currentYear}-${currentMonth}`;
+
+                        const lAge = getLunarAge(currentYear, currentMonth, currentDay);
                         
-                        // Criterio astronómico: Rango de Luna Llena (14.76 +- 1.0 días)
-                        if (Math.abs(lAge - 14.76) <= 1.0) {
+                        // Si está en la ventana de luna llena astronómica y no hemos marcado este mes todavía
+                        if (Math.abs(lAge - 14.76) <= 1.0 && monthKey !== lastMarkedMonthKey) {
                             const point = meta.data[idx];
                             if (point) {
                                 const xPos = point.x;
                                 const yPos = point.y;
 
-                                // Dibujar círculo de Luna Llena brillante
                                 ctx.beginPath();
                                 ctx.arc(xPos, yPos, 5, 0, 2 * Math.PI);
                                 ctx.fillStyle = '#FFFFFF';
@@ -317,7 +316,10 @@
                                 ctx.lineWidth = 1;
                                 ctx.strokeStyle = '#000000';
                                 ctx.stroke();
-                                ctx.shadowBlur = 0; // Reset
+                                ctx.shadowBlur = 0; 
+
+                                // Bloquear el mes actual para que no se dibujen lunas los días adyacentes de la misma ventana
+                                lastMarkedMonthKey = monthKey;
                             }
                         }
                     });
@@ -327,7 +329,7 @@
         }
     };
 
-    // --- CONTROLADOR DE PESTAÑAS (TABS) ---
+    // --- MANEJADOR DE PESTAÑAS (TABS) ---
     document.querySelectorAll('.btn-nav').forEach(btn => {
         btn.addEventListener('click', function() {
             if (this.id === 'openAbout') return;
@@ -336,21 +338,17 @@
             this.classList.add('active');
             document.getElementById(this.dataset.target).classList.add('active');
             
-            // Forzar renderizado responsivo de los canvas al cambiar de pestaña
             if (dailyChartInstance) dailyChartInstance.resize();
             if (compareChartInstance) compareChartInstance.resize();
         });
     });
 
-    // Lógica Ventana Modal (About)
     const modal = document.getElementById('aboutModal');
     document.getElementById('openAbout').addEventListener('click', () => modal.classList.add('active'));
     document.getElementById('closeAbout').addEventListener('click', () => modal.classList.remove('active'));
     modal.addEventListener('click', (e) => { if(e.target === modal) modal.classList.remove('active'); });
 
-    // --- INITIALIZACIÓN DE GRÁFICOS ---
     function initCharts() {
-        // Gráfico de Barras Principal
         const ctxMain = document.getElementById('dailyChart').getContext('2d');
         dailyChartInstance = new Chart(ctxMain, {
             type: 'bar',
@@ -366,14 +364,13 @@
             plugins: [climateAstroPlugin]
         });
 
-        // Gráfico de Líneas Comparativo
         const ctxCompare = document.getElementById('compareChart').getContext('2d');
         compareChartInstance = new Chart(ctxCompare, {
             type: 'line',
             data: { labels: Array.from({length: 365}, (_, i) => `Día ${i + 1}`), datasets: [] },
             options: {
                 responsive: true, maintainAspectRatio: false, resizeDelay: 100,
-                elements: { point: { radius: 0, hoverRadius: 4 } }, // Esconder puntos nativos para no saturar
+                elements: { point: { radius: 0, hoverRadius: 4 } }, 
                 scales: {
                     x: { grid: { color: '#333' }, ticks: { color: '#aaa', font: { size: 9 }, maxTicksLimit: 20 } },
                     y: { grid: { color: '#444' }, title: { display: true, text: 'Precipitación Acumulada Diaria (mm)', color: '#aaa' }, ticks: { color: '#aaa' } }
@@ -392,13 +389,11 @@
         const checkContainer = document.getElementById('compare-checkboxes');
         
         YEARS.forEach(y => {
-            // Selector Principal
             const opt = document.createElement('option');
             opt.value = `CHELSA_prec_${y}_stack.tif`;
             opt.text = `Año ${y} (Daily Stack)`;
             selectEl.appendChild(opt);
 
-            // Checkboxes Comparativa
             const label = document.createElement('label');
             label.className = 'checkbox-item';
             label.innerHTML = `<input type="checkbox" value="${y}" class="year-chk"> ${y}`;
@@ -421,36 +416,57 @@
         return [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     }
 
+    // --- GENERADOR DE FECHAS SEGURO (ESTRICTAMENTE EN UTC SIN DESFASES) ---
     function generateCalendarLabels(year, totalBands) {
         const labels = [];
         mondayIndicesGlobal = [];
-        let dateObj = new Date(year, 0, 1);
+        
+        // Inicializar de forma síncrona usando componentes enteros controlados
+        let currentYear = year;
+        let currentMonth = 0; // Enero
+        let currentDay = 1;
+        
+        const daysInMonths = getDaysInMonths(year);
+
         for (let i = 0; i < totalBands; i++) {
-            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const dd = String(dateObj.getDate()).padStart(2, '0');
-            labels.push(`${dateObj.getFullYear()}-${mm}-${dd}`);
-            if (dateObj.getDay() === 1) mondayIndicesGlobal.push(i);
-            dateObj.setDate(dateObj.getDate() + 1);
+            const mmStr = String(currentMonth + 1).padStart(2, '0');
+            const ddStr = String(currentDay).padStart(2, '0');
+            labels.push(`${currentYear}-${mmStr}-${ddStr}`);
+
+            // Validar de forma matemática el día de la semana para los Lunes sin usar Date local
+            const testDate = new Date(Date.UTC(currentYear, currentMonth, currentDay));
+            if (testDate.getUTCDay() === 1) {
+                mondayIndicesGlobal.push(i);
+            }
+
+            currentDay++;
+            if (currentDay > daysInMonths[currentMonth]) {
+                currentDay = 1;
+                currentMonth++;
+                if (currentMonth > 11) {
+                    currentMonth = 0;
+                    currentYear++;
+                }
+            }
         }
         return labels;
     }
 
-    // Algoritmo de interpolación térmica de colores (Azul -> Verde -> Amarillo -> Anaranjado -> Rojo)
     function getThermalGradientColor(value, min, max) {
         if (max === min) return '#00E5FF';
-        const ratio = (value - min) / (max - min); // 1 es max lluvia (Azul), 0 es min lluvia (Rojo)
+        const ratio = (value - min) / (max - min); 
         
         let r = 0, g = 0, b = 0;
-        if (ratio > 0.75) { // Azul a Verde Claro
+        if (ratio > 0.75) { 
             const segmentRatio = (ratio - 0.75) / 0.25;
             r = Math.round(13 + (1-segmentRatio) * 30); g = Math.round(71 + segmentRatio * 150); b = Math.round(161 + (1-segmentRatio) * 50);
-        } else if (ratio > 0.50) { // Verde Claro a Amarillo
+        } else if (ratio > 0.50) { 
             const segmentRatio = (ratio - 0.50) / 0.25;
             r = Math.round(255 * (1 - segmentRatio)); g = 200; b = 0;
-        } else if (ratio > 0.25) { // Amarillo a Anaranjado
+        } else if (ratio > 0.25) { 
             const segmentRatio = (ratio - 0.25) / 0.25;
             r = 255; g = Math.round(200 * segmentRatio + 100 * (1 - segmentRatio)); b = 0;
-        } else { // Anaranjado a Rojo Fuego
+        } else { 
             const segmentRatio = ratio / 0.25;
             r = 255; g = Math.round(100 * segmentRatio); b = 0;
         }
@@ -482,7 +498,6 @@
 
     document.getElementById('layer-select').addEventListener('change', e => initRemoteTiff(e.target.value));
 
-    // --- PIPELINE DE CONSULTA ESPACIAL POR CLIC ---
     map.on('click', async function(e) {
         const lat = e.latlng.lat; const lng = e.latlng.lng;
         if (!tiffImage || !rasterBounds) return;
@@ -494,13 +509,12 @@
 
         const posX = Math.floor(((lng - rasterBounds[0]) / (rasterBounds[2] - rasterBounds[0])) * rasterWidth);
         const posY = Math.floor(((rasterBounds[3] - lat) / (rasterBounds[3] - rasterBounds[1])) * rasterHeight);
-        activePixelCoords = { posX, posY }; // Almacenar coordenadas de la celda activa
+        activePixelCoords = { posX, posY }; 
 
         printLog(`Muestreando celda matriz [X: ${posX}, Y: ${posY}]...`);
         executeSingleAnalysis();
     });
 
-    // Análisis unificado del tablero principal
     async function executeSingleAnalysis() {
         if (!activePixelCoords || !tiffImage) return;
         try {
@@ -564,7 +578,7 @@
             dailyChartInstance.update();
 
             document.getElementById('stat-acum').innerText = `${totalAcum.toFixed(1)} mm`;
-            document.getElementById('stat-prom').innerText = `${totalAcum / validDays.toFixed(2)} mm/d`;
+            document.getElementById('stat-prom').innerText = `${(totalAcum / validDays).toFixed(2)} mm/d`;
             document.getElementById('stat-days-rain').innerText = `${countRain} días`;
             document.getElementById('stat-days-dry').innerText = `${countDry} días`;
             document.getElementById('stat-streak-dry').innerText = `${maxDryStreak} días seguidos`;
@@ -580,23 +594,20 @@
         } catch (err) { printLog(`Error: ${err.message}`); }
     }
 
-    // --- MOTOR MULTI-THREAD DE COMPARACIÓN INTERANUAL DE TEXTURAS ---
+    // --- PROCESADOR DE COMPARATIVA INTERANUAL MULTIBANDA ---
     document.getElementById('btn-run-compare').addEventListener('click', async function() {
         if (!activePixelCoords) { alert("Por favor, seleccione primero un punto geográfico de Costa Rica en el mapa del Tablero Principal."); return; }
-        
         const checkedBoxes = document.querySelectorAll('.year-chk:checked');
         if (checkedBoxes.length === 0) { alert("Debe seleccionar al menos un año de la lista para graficar la tendencia."); return; }
 
         const selectedYears = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
         printLog(`Iniciando extracción por bloques LFS para los años: [${selectedYears.join(', ')}]`);
 
-        // Estructura temporal para recolectar las curvas de lluvia
         const yearlySeriesResults = [];
 
         for (const year of selectedYears) {
             const fileName = `CHELSA_prec_${year}_stack.tif`;
             const rawUrl = `https://media.githubusercontent.com/media/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${fileName}`;
-            printLog(`Streaming remoto -> Año ${year}`);
 
             try {
                 const instance = await GeoTIFF.fromUrl(rawUrl, { forceCSPIsolation: true });
@@ -613,19 +624,17 @@
                         v = v * 0.1; if (v < 0) v = 0;
                         cumulativeSum += v;
                     }
-                    dailyCurve.push(cumulativeSum); // Curva de precipitación acumulada
+                    dailyCurve.push(cumulativeSum); 
                 }
 
                 yearlySeriesResults.push({ year: year, totalRain: cumulativeSum, curve: dailyCurve });
             } catch (err) { printLog(`Error extrayendo año ${year}: ${err.message}`); }
         }
 
-        // Encontrar extremos del grupo seleccionado para armar el degradado térmico analítico
         const totalRainfalls = yearlySeriesResults.map(s => s.totalRain);
         const maxRainSelected = Math.max(...totalRainfalls);
         const minRainSelected = Math.min(...totalRainfalls);
 
-        // Mapear los arreglos hacia la estructura interna de Chart.js
         compareChartInstance.data.datasets = yearlySeriesResults.map(series => {
             const hexColor = getThermalGradientColor(series.totalRain, minRainSelected, maxRainSelected);
             return {
@@ -638,7 +647,7 @@
             };
         });
 
-        // Configurar etiquetas base del eje X (Se asume un año estándar de 365 días)
+        // Forzar etiquetas usando el año pivote para que el calendario del eje X mantenga regularidad lineal UTC
         compareChartInstance.data.labels = generateCalendarLabels(selectedYears[0], 365);
         compareChartInstance.update();
         printLog("¡Gráfico de tendencias interanuales e hitos lunares actualizado!");
