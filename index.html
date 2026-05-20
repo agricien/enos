@@ -13,7 +13,9 @@
             --accent-purple: #9C27B0; 
         }
         
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
 
         body { 
             font-family: 'Segoe UI', sans-serif; 
@@ -31,7 +33,11 @@
             margin: 0 auto; 
         }
         
-        @media (max-width: 500px) { .dashboard { grid-template-columns: 1fr; } }
+        @media (max-width: 500px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
 
         .panel { 
             background: var(--container-bg); 
@@ -72,7 +78,9 @@
             outline: none;
         }
         
-        select:focus { border-color: var(--accent-purple); }
+        select:focus {
+            border-color: var(--accent-purple);
+        }
 
         .result-box { 
             background: #1e1e1e; 
@@ -139,9 +147,7 @@
         <h2>1. Serie Temporal de Precipitación Diaria (CHELSA)</h2>
         <div>
             <label for="layer-select" style="font-size: 9pt; color: #aaa; display:block; margin-bottom:5px;">Seleccione el stack anual:</label>
-            <select id="layer-select">
-                <option value="">🔄 Escaneando repositorio de GitHub...</option>
-            </select>
+            <select id="layer-select"></select>
         </div>
         <div id="map"></div>
         
@@ -220,6 +226,8 @@
     const REPO_NAME = "enos";
     const BRANCH = "main";
     
+    // Lista de enlaces fijos que incluye los nuevos años históricos cargados
+    const YEARS = [1982,1983,1997,1998,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2020,2021,2022,2023,2024,2025];
     const MONTH_NAMES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const SHORT_MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -317,59 +325,18 @@
         });
     }
 
-    // NUEVA FUNCIÓN: Consulta la API de GitHub para listar y ordenar dinámicamente los archivos del repositorio
-    async function fetchLayersFromGitHub() {
-        printLog("Consultando la API de GitHub para listar archivos .tif...");
-        const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents?ref=${BRANCH}`;
+    function setupSelector() {
         const selectEl = document.getElementById('layer-select');
-
-        try {
-            const response = await fetch(apiUrl);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const files = await response.json();
-
-            // Filtrar archivos que cumplan estrictamente con el patrón de nomenclatura del stack diario
-            const tifFiles = files.filter(f => f.name.toLowerCase().endsWith('.tif') && f.name.includes('_prec_'));
-
-            // Mapear los nombres y extraer el año numérico para poder ordenar la lista cronológicamente
-            const layers = tifFiles.map(f => {
-                const match = f.name.match(/_(\d{4})_/);
-                return {
-                    name: f.name,
-                    year: match ? parseInt(match[1]) : 0
-                };
-            }).filter(l => l.year > 0);
-
-            // Ordenar los años de menor a mayor (Ej: de 1982 a 2025)
-            layers.sort((a, b) => a.year - b.year);
-
-            selectEl.innerHTML = '';
-            if (layers.length === 0) {
-                selectEl.innerHTML = '<option>No se encontraron coberturas .tif válidas</option>';
-                return;
-            }
-
-            // Generar las opciones del selector de manera dinámica
-            layers.forEach(layer => {
-                const opt = document.createElement('option');
-                opt.value = layer.name;
-                opt.text = `Año ${layer.year} (Daily Stack)`;
-                selectEl.appendChild(opt);
-            });
-
-            printLog(`Se detectaron y cargaron ${layers.length} stacks anuales automáticamente.`);
-            
-            // Establecer el año 2015 por defecto si existe, de lo contrario tomar el primero de la lista
-            const defaultTarget = layers.find(l => l.year === 2015) ? layers.find(l => l.year === 2015).name : layers[0].name;
-            selectEl.value = defaultTarget;
-            
-            extractYear(defaultTarget);
-            initRemoteTiff(defaultTarget);
-
-        } catch (err) {
-            printLog(`Error de automatización: API GitHub no disponible (${err.message}).`);
-            selectEl.innerHTML = '<option>Error al actualizar lista automática</option>';
-        }
+        YEARS.forEach(y => {
+            const opt = document.createElement('option');
+            opt.value = `CHELSA_prec_${y}_stack.tif`;
+            opt.text = `Año ${y} (Daily Stack)`;
+            selectEl.appendChild(opt);
+        });
+        selectEl.value = "CHELSA_prec_2015_stack.tif";
+        extractYear(selectEl.value);
+        initChart();
+        initRemoteTiff(selectEl.value);
     }
 
     function extractYear(fileName) {
@@ -596,7 +563,7 @@
             document.getElementById('stat-month-rain').style.color = '#00E5FF'; 
             
             document.getElementById('raster-bands-info').innerText = `Procesamiento exitoso: ${validDays} capas analizadas de forma síncrona.`;
-            printLog Pisado;
+            printLog(`Análisis estadístico y gráfico cromático multibanda completados.`);
 
         } catch (err) {
             printLog(`Error al procesar series de tiempo: ${err.message}`);
@@ -634,9 +601,7 @@
 
     function printLog(msg) { const consoleEl = document.getElementById('console-log'); consoleEl.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`; consoleEl.scrollTop = consoleEl.scrollHeight; }
     
-    // Ejecución de la inicialización de gráficos y escaneo dinámico de la API de GitHub
-    initChart();
-    fetchLayersFromGitHub();
+    setupSelector();
 </script>
 </body>
 </html>
