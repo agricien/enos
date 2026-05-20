@@ -184,15 +184,14 @@
             <div>
                 <label for="axis-mode-select" style="font-size: 9pt; color: #aaa; display:block; margin-bottom:5px;">Estructura del Eje X:</label>
                 <select id="axis-mode-select">
-                    <option value="calendar">Mes Calendario (Semanas Divididas)</option>
+                    <option value="calendar">Mes Calendario (Día Mes)</option>
                     <option value="julian">Día Juliano (Contador Continuo)</option>
                     <option value="lunar">Mes Lunar (Progreso de la Edad Lunar)</option>
                 </select>
             </div>
             <div>
                 <label for="moving-average-select" style="font-size: 9pt; color: #aaa; display:block; margin-bottom:5px;">Media Móvil Simple:</label>
-                <select id="moving-average-select">
-                    </select>
+                <select id="moving-average-select"></select>
             </div>
         </div>
         <button class="btn-action" id="btn-run-compare" style="margin-top: 5px;">Graficar Comparativa</button>
@@ -254,7 +253,7 @@
     let compareChartInstance = null;
     let mondayIndicesGlobal = [];
     let compareXMode = "calendar"; 
-    let globalCompareRawData = []; // Buffer de memoria para evitar re-descargas en red
+    let globalCompareRawData = []; 
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
@@ -301,11 +300,17 @@
 
                         if (isCompareChart) {
                             if (compareXMode === "calendar") {
-                                const parts = label.split('-');
-                                if (parts.length === 3) { currentYear = parseInt(parts[0]); currentMonth = parseInt(parts[1]); currentDay = parseInt(parts[2]); }
+                                // Separar "DD Mes" para parsear componentes UTC de simulación lunar
+                                const parts = label.split(' ');
+                                if (parts.length === 2) {
+                                    currentDay = parseInt(parts[0]);
+                                    currentMonth = SHORT_MONTHS.indexOf(parts[1]) + 1;
+                                    currentYear = globalCompareRawData[datasetIdx] ? globalCompareRawData[datasetIdx].year : 2015;
+                                }
                             } else if (compareXMode === "julian") {
                                 let dateFromJulian = new Date(Date.UTC(currentYear, 0, idx + 1));
                                 currentMonth = dateFromJulian.getUTCMonth() + 1; currentDay = dateFromJulian.getUTCDate();
+                                currentYear = globalCompareRawData[datasetIdx] ? globalCompareRawData[datasetIdx].year : 2015;
                             } else { return; } 
                         } else {
                             const parts = label.split('-');
@@ -379,7 +384,10 @@
                             callback: function(val) {
                                 const label = this.getLabelForValue(val);
                                 if (compareXMode === "calendar") {
-                                    if (label && (label.endsWith("-01") || label.endsWith("-15"))) { const parts = label.split('-'); return label.endsWith("-01") ? SHORT_MONTHS[parseInt(parts[1]) - 1] : parts[2]; }
+                                    // Filtrar tics para limpiar la densidad del eje en modo Día Mes
+                                    if (label && (label.startsWith("01 ") || label.startsWith("15 "))) {
+                                        return label.startsWith("01 ") ? label.split(' ')[1] : label.split(' ')[0];
+                                    }
                                     return null;
                                 }
                                 return label; 
@@ -402,10 +410,8 @@
         const checkContainer = document.getElementById('compare-checkboxes');
         const mvSelect = document.getElementById('moving-average-select');
 
-        // Llenar selector de media móvil de 1 a 30 días
         for(let d=1; d<=30; d++) {
-            const optMv = document.createElement('option');
-            optMv.value = d;
+            const optMv = document.createElement('option'); optMv.value = d;
             optMv.text = d === 1 ? "Sin filtro (1 Día)" : `${d} Días`;
             mvSelect.appendChild(optMv);
         }
@@ -443,6 +449,25 @@
         return labels;
     }
 
+    // NUEVO ENFOQUE: Genera etiquetas de eje X relativas puras como "Día Mes" (Omitiendo el Año)
+    function generateRelativeCalendarLabels(totalBands) {
+        const labels = []; mondayIndicesGlobal = [];
+        let dummyMonth = 0, dummyDay = 1;
+        const standardDaysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+        for (let i = 0; i < totalBands; i++) {
+            const dayStr = String(dummyDay).padStart(2, '0');
+            labels.push(`${dayStr} ${SHORT_MONTHS[dummyMonth]}`);
+            
+            // Aproximación de lunes para líneas verticales de cuadrícula de fondo interanual
+            if (dummyDay % 7 === 1) mondayIndicesGlobal.push(i);
+
+            dummyDay++;
+            if (dummyDay > standardDaysInMonths[dummyMonth]) { dummyDay = 1; dummyMonth++; if (dummyMonth > 11) dummyMonth = 0; }
+        }
+        return labels;
+    }
+
     function getThermalGradientColor(value, min, max) {
         if (max === min) return '#00E5FF'; const ratio = (value - min) / (max - min);
         let r = 0, g = 0, b = 0;
@@ -453,19 +478,13 @@
         return `rgb(${r}, ${g}, ${b})`;
     }
 
-    // Algoritmo matemático para calcular la media móvil simple en vectores de una sola dimensión
     function applyMovingAverage(dataArray, windowSize) {
         if (windowSize <= 1) return dataArray;
         const smoothed = [];
         for (let i = 0; i < dataArray.length; i++) {
-            let sum = 0;
-            let count = 0;
-            // Ventana móvil centrada hacia atrás para mantener coherencia temporal estricta
+            let sum = 0, count = 0;
             for (let j = 0; j < windowSize; j++) {
-                if (i - j >= 0) {
-                    sum += dataArray[i - j];
-                    count++;
-                }
+                if (i - j >= 0) { sum += dataArray[i - j]; count++; }
             }
             smoothed.push(count > 0 ? sum / count : 0);
         }
@@ -543,14 +562,14 @@
         } catch (err) { printLog(`Error: ${err.message}`); }
     }
 
-    // --- SUBPANEL: PIPELINE DE COMPARACIÓN INTERANUAL DIARIA ---
+    // --- SUBPANEL COMPARATIVO ---
     document.getElementById('btn-run-compare').addEventListener('click', async function() {
         if (!activePixelCoords) { alert("Seleccione primero un punto geográfico en el mapa del Tablero Principal."); return; }
         const checkedBoxes = document.querySelectorAll('.year-chk:checked');
         if (checkedBoxes.length === 0) { alert("Debe seleccionar al menos un año."); return; }
 
         const selectedYears = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
-        printLog(`Sincronizando bloques remotos GeoTIFF LFS...`);
+        printLog(`Sincronizando bloques remotos GeoTIFF LFS de la serie...`);
         globalCompareRawData = [];
 
         for (const year of selectedYears) {
@@ -562,7 +581,7 @@
                 const rasterData = await img.readRasters({ window: [activePixelCoords.posX, activePixelCoords.posY, activePixelCoords.posX + 1, activePixelCoords.posY + 1], interleave: false });
                 
                 let cumulativeSum = 0; 
-                const dailyRainArray = []; // Almacena el valor diario puro de lluvia por banda
+                const dailyRainArray = []; 
                 const metaDates = []; 
                 const totalBands = rasterData.length;
                 const daysInMonths = getDaysInMonths(year);
@@ -570,12 +589,8 @@
 
                 for (let i = 0; i < totalBands; i++) {
                     let v = rasterData[i][0];
-                    if (v !== null && v !== -9999 && !isNaN(v)) { 
-                        v = v * 0.1; 
-                        if (v < 0) v = 0; 
-                        cumulativeSum += v; 
-                    }
-                    dailyRainArray.push(v); // CORRECCIÓN: Guardar el valor diario, no el acumulativo
+                    if (v !== null && v !== -9999 && !isNaN(v)) { v = v * 0.1; if (v < 0) v = 0; cumulativeSum += v; }
+                    dailyRainArray.push(v); 
                     metaDates.push({ year, month: currentMonth + 1, day: currentDay, value: v });
                     
                     currentDay++;
@@ -587,6 +602,7 @@
         renderCompareChart();
     });
 
+    // --- MOTOR DE DISTRIBUCIÓN CROMÁTICA DIARIA DE LA COMPARATIVA ---
     function renderCompareChart() {
         if (globalCompareRawData.length === 0) return;
         compareXMode = document.getElementById('axis-mode-select').value;
@@ -596,18 +612,16 @@
         const maxRain = Math.max(...totals); const minRain = Math.min(...totals);
 
         if (compareXMode === "calendar") {
-            compareChartInstance.data.labels = generateCalendarLabels(globalCompareRawData[0].year, 365);
+            // CORRECCIÓN: Eje X limpio mostrando únicamente "Día Mes" sin el año prefijado
+            compareChartInstance.data.labels = generateRelativeCalendarLabels(365);
             compareChartInstance.data.datasets = globalCompareRawData.map(series => {
-                // Aplicar suavizado por media móvil sobre la serie de valores diarios
                 const smoothedData = applyMovingAverage(series.dailyValues.slice(0, 365), mvSize);
                 return {
                     label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
-                    data: smoothedData, 
-                    borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), 
-                    backgroundColor: 'transparent', tension: 0.15
+                    data: smoothedData, borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), backgroundColor: 'transparent', tension: 0.15
                 };
             });
-            compareChartInstance.options.scales.x.title.text = "Mes del Año";
+            compareChartInstance.options.scales.x.title.text = "Mes del Año (Estructura Comparativa Regular)";
         } 
         else if (compareXMode === "julian") {
             compareChartInstance.data.labels = Array.from({length: 365}, (_, i) => `Día ${i + 1}`);
@@ -615,14 +629,13 @@
                 const smoothedData = applyMovingAverage(series.dailyValues.slice(0, 365), mvSize);
                 return {
                     label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
-                    data: smoothedData, 
-                    borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), 
-                    backgroundColor: 'transparent', tension: 0.15
+                    data: smoothedData, borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), backgroundColor: 'transparent', tension: 0.15
                 };
             });
             compareChartInstance.options.scales.x.title.text = "Día Juliano del Año";
         } 
         else if (compareXMode === "lunar") {
+            // CORRECCIÓN: Agrupación robusta basada en el día del Mes Sinódico (0 a 29) para graficar lluvia diaria real
             const lunarBins = Array.from({length: 30}, (_, i) => i);
             compareChartInstance.data.labels = lunarBins.map(b => `Día Lunar ${b}`);
             
@@ -637,22 +650,20 @@
                     binCounts[binIdx]++;
                 });
 
-                const rawLunarCurve = binSums.map((val, idx) => binCounts[idx] > 0 ? (val / binCounts[idx]) : 0);
-                const smoothedLunarCurve = applyMovingAverage(rawLunarCurve, mvSize);
+                // Calcular precipitación diaria promedio por cada día de la fase lunar
+                const rawLunarValues = binSums.map((sum, idx) => binCounts[idx] > 0 ? (sum / binCounts[idx]) : 0);
+                const smoothedLunarValues = applyMovingAverage(rawLunarValues, mvSize);
 
                 return {
                     label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
-                    data: smoothedLunarCurve, 
-                    borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), 
-                    backgroundColor: 'transparent', tension: 0.15
+                    data: smoothedLunarValues, borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), backgroundColor: 'transparent', tension: 0.15
                 };
             });
-            compareChartInstance.options.scales.x.title.text = "Edad de la Luna (0 = Luna Nueva, 14.7 = Luna Llena)";
+            compareChartInstance.options.scales.x.title.text = "Día del Mes Sinódico Lunar (0 = Luna Nueva, 14.7 = Luna Llena)";
         }
         compareChartInstance.update();
     }
 
-    // Escuchadores de eventos para recalcular ejes y medias móviles al vuelo de manera local
     document.getElementById('axis-mode-select').addEventListener('change', renderCompareChart);
     document.getElementById('moving-average-select').addEventListener('change', renderCompareChart);
 
