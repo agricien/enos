@@ -17,18 +17,20 @@
         .result-box { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; }
         #console-log { width: 100%; height: 120px; font-family: 'Courier New', monospace; font-size: 9pt; background: #111111; color: #00ff00; padding: 10px; box-sizing: border-box; border-radius: 4px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #444; }
         
-        /* Tabla de series de tiempo mensuales */
-        .months-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
-        .month-card { background: #333; padding: 8px; border-radius: 4px; text-align: center; border: 1px solid #444; }
-        .month-name { font-size: 8pt; color: #aaa; text-transform: uppercase; }
-        .month-val { font-size: 12pt; font-weight: bold; color: #00ff00; }
+        /* Cuadrícula de estadísticas anuales calculadas del stack diario */
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
+        .stat-card { background: #333; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #444; }
+        .stat-card.blue { border-left: 4px solid #1565C0; }
+        .stat-card.orange { border-left: 4px solid #E65100; }
+        .stat-name { font-size: 9pt; color: #aaa; }
+        .stat-val { font-size: 16pt; font-weight: bold; color: #00ff00; margin-top: 5px; }
     </style>
 </head>
 <body>
 
 <div class="dashboard">
     <div class="panel">
-        <h2>1. Serie Temporal de Precipitación (CHELSA)</h2>
+        <h2>1. Serie Temporal de Precipitación Diaria (CHELSA)</h2>
         <div>
             <label style="font-size: 9pt; color: #aaa; display:block; margin-bottom:5px;">Seleccione el stack anual:</label>
             <select id="layer-select"></select>
@@ -37,24 +39,29 @@
     </div>
 
     <div class="panel">
-        <h2>2. Análisis Multibanda (Precipitación Mensual)</h2>
-        <div id="click-coords" style="color: #aaa;">Coordenadas: Seleccione un punto en el mapa...</div>
+        <h2>2. Análisis Estadístico del Píxel (Matriz de 365/366 días)</h2>
+        <div id="click-coords" style="color: #aaa;">Coordenadas: Seleccione un punto en el mapa de Costa Rica...</div>
         <div class="result-box">
-            <div style="font-weight: bold; color: #ccc; margin-bottom: 5px;">Distribución mensual estimada (mm):</div>
-            <div class="months-grid" id="months-container">
-                <div class="month-card"><div class="month-name">Ene</div><div class="month-val" id="m0">—</div></div>
-                <div class="month-card"><div class="month-name">Feb</div><div class="month-val" id="m1">—</div></div>
-                <div class="month-card"><div class="month-name">Mar</div><div class="month-val" id="m2">—</div></div>
-                <div class="month-card"><div class="month-name">Abr</div><div class="month-val" id="m3">—</div></div>
-                <div class="month-card"><div class="month-name">May</div><div class="month-val" id="m4">—</div></div>
-                <div class="month-card"><div class="month-name">Jun</div><div class="month-val" id="m5">—</div></div>
-                <div class="month-card"><div class="month-name">Jul</div><div class="month-val" id="m6">—</div></div>
-                <div class="month-card"><div class="month-name">Ago</div><div class="month-val" id="m7">—</div></div>
-                <div class="month-card"><div class="month-name">Sep</div><div class="month-val" id="m8">—</div></div>
-                <div class="month-card"><div class="month-name">Oct</div><div class="month-val" id="m9">—</div></div>
-                <div class="month-card"><div class="month-name">Nov</div><div class="month-val" id="m10">—</div></div>
-                <div class="month-card"><div class="month-name">Dic</div><div class="month-val" id="m11">—</div></div>
+            <div style="font-weight: bold; color: #ccc; margin-bottom: 5px;">Métricas calculadas para la celda seleccionada:</div>
+            <div class="stats-grid">
+                <div class="stat-card blue">
+                    <div class="stat-name">Σ Acumulado Anual</div>
+                    <div class="stat-val" id="stat-acum">—</div>
+                </div>
+                <div class="stat-card blue">
+                    <div class="stat-name">⌀ Promedio Diario</div>
+                    <div class="stat-val" id="stat-prom">—</div>
+                </div>
+                <div class="stat-card orange">
+                    <div class="stat-name">↑ Máximo Diario (Pico)</div>
+                    <div class="stat-val" id="stat-max">—</div>
+                </div>
+                <div class="stat-card orange">
+                    <div class="stat-name">↓ Mínimo Diario</div>
+                    <div class="stat-val" id="stat-min">—</div>
+                </div>
             </div>
+            <div id="raster-bands-info" style="font-size: 9pt; color: #aaa; margin-top: 12px; text-align: center;"></div>
         </div>
         <h2>Consola del Pipeline Geoespacial</h2>
         <div id="console-log">Entorno web inicializado.</div>
@@ -69,11 +76,13 @@
     const REPO_NAME = "enos";
     const BRANCH = "main";
     
+    // Dataset real mapeado de tu repositorio
     const YEARS = [2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2020,2021,2022,2023,2024,2025];
 
     const map = L.map('map').setView([9.7489, -83.7534], 8);
     let activeMarker = null;
     let currentBBoxLayer = null;
+    let tiffInstance = null;
     let tiffImage = null;
     let rasterBounds = null; 
     let rasterWidth = 0;
@@ -86,7 +95,7 @@
         YEARS.forEach(y => {
             const opt = document.createElement('option');
             opt.value = `CHELSA_prec_${y}_stack.tif`;
-            opt.text = `Año ${y} (Multi-temporal Stack)`;
+            opt.text = `Año ${y} (Daily Stack)`;
             selectEl.appendChild(opt);
         });
         initRemoteTiff(selectEl.value);
@@ -94,27 +103,27 @@
 
     async function initRemoteTiff(fileName) {
         if (!fileName) return;
-        printLog(`Conectando al raster mediante jsDelivr LFS Bypass: ${fileName}`);
+        printLog(`Conectando al stack diario mediante jsDelivr LFS Bypass: ${fileName}`);
         
-        // El CDN de jsDelivr resuelve el puntero LFS entregando el binario real con cabeceras CORS correctas
         const rawUrl = `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${REPO_NAME}@${BRANCH}/${fileName}`;
 
         try {
-            const tiffInstance = await GeoTIFF.fromUrl(rawUrl);
+            tiffInstance = await GeoTIFF.fromUrl(rawUrl);
             tiffImage = await tiffInstance.getImage();
 
             rasterWidth = tiffImage.getWidth();
             rasterHeight = tiffImage.getHeight();
             rasterBounds = tiffImage.getBoundingBox();
 
-            printLog(`¡Éxito! Cabeceras GeoTIFF mapeadas desde el servidor remoto.`);
+            printLog(`¡Éxito! Cabeceras leídas. Resolución espacial: ${rasterWidth} x ${rasterHeight}`);
 
             if (currentBBoxLayer) map.removeLayer(currentBBoxLayer);
             const boundsLeaflet = [[rasterBounds[1], rasterBounds[0]], [rasterBounds[3], rasterBounds[2]]];
             currentBBoxLayer = L.rectangle(boundsLeaflet, {color: "#9C27B0", weight: 1.5, fillOpacity: 0.05}).addTo(map);
+            map.fitBounds(boundsLeaflet);
 
         } catch (err) {
-            printLog(`Error de lectura: ${err.message}`);
+            printLog(`Error de lectura LFS: ${err.message}`);
         }
     }
 
@@ -139,30 +148,58 @@
         const posX = Math.floor(((lng - rasterBounds[0]) / (rasterBounds[2] - rasterBounds[0])) * rasterWidth);
         const posY = Math.floor(((rasterBounds[3] - lat) / (rasterBounds[3] - rasterBounds[1])) * rasterHeight);
 
-        printLog(`Muestreando celda matriz [X: ${posX}, Y: ${posY}] para las 12 bandas mensuales...`);
+        printLog(`Extrayendo serie de tiempo diaria para la celda [Col: ${posX}, Fila: ${posY}]...`);
 
         try {
+            // Lee todas las bandas (días) correspondientes a la celda seleccionada
             const rasterData = await tiffImage.readRasters({ window: [posX, posY, posX + 1, posY + 1] });
-            
-            for (let i = 0; i < 12; i++) {
-                const cellVal = rasterData[i] ? rasterData[i][0] : null;
-                const el = document.getElementById(`m${i}`);
-                if (cellVal === null || cellVal === -9999 || isNaN(cellVal)) {
-                    el.innerText = "N/D";
-                    el.style.color = "#ffaa00";
-                } else {
-                    el.innerText = `${cellVal.toFixed(1)}`;
-                    el.style.color = "#00ff00";
+            const totalBands = rasterData.length;
+
+            let totalAcum = 0;
+            let maxVal = -Infinity;
+            let minVal = Infinity;
+            let validDays = 0;
+
+            // Procesar la serie de tiempo de los 365/366 días de forma lineal
+            for (let i = 0; i < totalBands; i++) {
+                const cellVal = rasterData[i][0];
+                
+                // Validar valores NoData del raster
+                if (cellVal !== null && cellVal !== -9999 && !isNaN(cellVal)) {
+                    totalAcum += cellVal;
+                    if (cellVal > maxVal) maxVal = cellVal;
+                    if (cellVal < minVal) minVal = cellVal;
+                    validDays++;
                 }
             }
-            printLog(`Extracción temporal completa.`);
+
+            if (validDays === 0) {
+                setPixelUIResult('—', '—', '—', '—');
+                document.getElementById('raster-bands-info').innerText = "Celda sin datos válidos (NoData).";
+                return;
+            }
+
+            const promedio = totalAcum / validDays;
+
+            // Renderizar métricas en la interfaz
+            document.getElementById('stat-acum').innerText = `${totalAcum.toFixed(1)} mm`;
+            document.getElementById('stat-prom').innerText = `${promedio.toFixed(2)} mm/d`;
+            document.getElementById('stat-max').innerText = `${maxVal.toFixed(2)} mm`;
+            document.getElementById('stat-min').innerText = `${minVal.toFixed(2)} mm`;
+            document.getElementById('raster-bands-info').innerText = `Bandas procesadas con éxito: ${validDays} días.`;
+
+            printLog(`Análisis completo para el periodo anual diario.`);
         } catch (err) {
-            printLog(`Error al decodificar bandas: ${err.message}`);
+            printLog(`Error al decodificar la serie de tiempo: ${err.message}`);
         }
     });
 
     function clearValues() {
-        for(let i=0; i<12; i++) { document.getElementById(`m${i}`).innerText = "—"; document.getElementById(`m${i}`).style.color = "#fff"; }
+        document.getElementById('stat-acum').innerText = "—";
+        document.getElementById('stat-prom').innerText = "—";
+        document.getElementById('stat-max').innerText = "—";
+        document.getElementById('stat-min').innerText = "—";
+        document.getElementById('raster-bands-info').innerText = "";
     }
 
     function printLog(msg) { const consoleEl = document.getElementById('console-log'); consoleEl.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`; consoleEl.scrollTop = consoleEl.scrollHeight; }
