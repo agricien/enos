@@ -26,8 +26,7 @@
         .stat-name { font-size: 8.5pt; color: #b0b0b0; text-transform: uppercase; font-weight: 600; }
         .stat-val { font-size: 14pt; font-weight: bold; color: #00ff00; margin-top: 4px; }
         
-        /* Contenedor del Gráfico debajo del mapa */
-        .chart-container { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; position: relative; height: 280px; width: 100%; box-sizing: border-box; }
+        .chart-container { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; position: relative; height: 320px; width: 100%; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -118,6 +117,7 @@
     
     const YEARS = [2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2020,2021,2022,2023,2024,2025];
     const MONTH_NAMES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const SHORT_MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
     const map = L.map('map').setView([9.6, -84.0], 8);
     let activeMarker = null;
@@ -128,16 +128,18 @@
     let boundsConfigured = false; 
     let currentYearGlobal = 2015;
     let dailyChartInstance = null;
+    
+    // Almacena qué índices del eje X corresponden a un Lunes
+    let mondayIndicesGlobal = [];
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-    // Inicialización del gráfico diario vacío
     function initChart() {
         const ctx = document.getElementById('dailyChart').getContext('2d');
         dailyChartInstance = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: Array.from({length: 365}, (_, i) => `Día ${i + 1}`),
+                labels: [],
                 datasets: [{
                     label: 'Precipitación Diaria (mm)',
                     data: [],
@@ -151,10 +153,53 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    x: { grid: { display: false }, ticks: { display: false } },
-                    y: { grid: { color: '#444' }, title: { display: true, text: 'mm', color: '#aaa' }, ticks: { color: '#aaa' } }
+                    x: { 
+                        grid: { 
+                            display: true,
+                            color: function(context) {
+                                // Dibuja una línea vertical visible únicamente si el índice del día corresponde a un lunes
+                                if (mondayIndicesGlobal.includes(context.index)) {
+                                    return 'rgba(156, 39, 176, 0.4)'; // Color fucsia/púrpura tenue para delimitar semanas
+                                }
+                                return 'transparent';
+                            },
+                            lineWidth: function(context) {
+                                return mondayIndicesGlobal.includes(context.index) ? 1.5 : 0;
+                            }
+                        },
+                        ticks: { 
+                            color: '#aaa',
+                            font: { size: 9 },
+                            maxRotation: 45,
+                            autoSkip: false,
+                            callback: function(val, index) {
+                                // Para no saturar el eje, mostramos la etiqueta del mes solo en días estratégicos o cambios de mes
+                                const label = this.getLabelForValue(val);
+                                if (label && label.endsWith("-01") || label.endsWith("-15")) {
+                                    const parts = label.split('-');
+                                    const monthIdx = parseInt(parts[1]) - 1;
+                                    return label.endsWith("-01") ? SHORT_MONTHS[monthIdx] : parts[2];
+                                }
+                                return null;
+                            }
+                        } 
+                    },
+                    y: { 
+                        grid: { color: '#444' }, 
+                        title: { display: true, text: 'Precipitación (mm)', color: '#aaa', font: { size: 10 } }, 
+                        ticks: { color: '#aaa' } 
+                    }
                 },
-                plugins: { legend: { display: false } }
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                return `Fecha: ${context[0].label}`;
+                            }
+                        }
+                    }
+                }
             }
         });
     }
@@ -181,6 +226,32 @@
     function getDaysInMonths(year) {
         const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
         return [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    }
+
+    // Genera un mapeo completo del calendario y detecta cuáles índices de la serie temporal son lunes
+    function generateCalendarLabels(year, totalBands) {
+        const labels = [];
+        mondayIndicesGlobal = [];
+        
+        // Creamos un objeto de fecha inicializado el 1 de enero del año correspondiente
+        let dateObj = new Date(year, 0, 1);
+        
+        for (let i = 0; i < totalBands; i++) {
+            const yyyy = dateObj.getFullYear();
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dd = String(dateObj.getDate()).padStart(2, '0');
+            
+            labels.push(`${yyyy}-${mm}-${dd}`);
+            
+            // Javascript Date.getDay() retorna 1 para Lunes
+            if (dateObj.getDay() === 1) {
+                mondayIndicesGlobal.push(i);
+            }
+            
+            // Avanzar un día
+            dateObj.setDate(dateObj.getDate() + 1);
+        }
+        return labels;
     }
 
     async function initRemoteTiff(fileName) {
@@ -266,7 +337,6 @@
             let currentMonthIdx = 0;
             let daysAccumulatedInCurrentMonth = 0;
             
-            // Array para almacenar la serie limpia que alimentará el gráfico
             const chartDataArray = [];
 
             for (let i = 0; i < totalBands; i++) {
@@ -324,8 +394,11 @@
 
             const promedio = totalAcum / validDays;
 
-            // Actualizar datos y etiquetas del gráfico dinámicamente
-            dailyChartInstance.data.labels = Array.from({length: validDays}, (_, i) => `Día ${i + 1}`);
+            // Generar etiquetas del calendario reales y calcular índices de los lunes
+            const calendarLabels = generateCalendarLabels(currentYearGlobal, validDays);
+
+            // Inyectar datos al gráfico y refrescarlo
+            dailyChartInstance.data.labels = calendarLabels;
             dailyChartInstance.data.datasets[0].data = chartDataArray;
             dailyChartInstance.update();
 
@@ -357,7 +430,9 @@
         document.getElementById('stat-month-dry').innerText = "—";
         document.getElementById('stat-month-rain').innerText = "—";
         document.getElementById('raster-bands-info').innerText = "";
+        mondayIndicesGlobal = [];
         if (dailyChartInstance) {
+            dailyChartInstance.data.labels = [];
             dailyChartInstance.data.datasets[0].data = [];
             dailyChartInstance.update();
         }
