@@ -186,7 +186,7 @@
                 <select id="axis-mode-select">
                     <option value="calendar">Mes Calendario (Día Mes)</option>
                     <option value="julian">Día Juliano (Contador Continuo)</option>
-                    <option value="lunar">Mes Lunar (Progreso de la Edad Lunar)</option>
+                    <option value="lunar">Mes Lunar (Edad Lunar en Días)</option>
                 </select>
             </div>
             <div>
@@ -276,6 +276,7 @@
             ctx.save();
 
             const isCompareChart = chart.canvas.id === "compareChart";
+            // Dibujar las líneas divisorias de los lunes solo en modo calendario
             const showGridLines = !isCompareChart || (isCompareChart && compareXMode === "calendar");
 
             if (showGridLines && mondayIndicesGlobal && mondayIndicesGlobal.length > 0) {
@@ -289,6 +290,7 @@
                 });
             }
 
+            // Marcado inteligente de lunas llenas en las curvas secuenciales (365 días)
             chart.data.datasets.forEach((dataset, datasetIdx) => {
                 const meta = chart.getDatasetMeta(datasetIdx);
                 if (!meta.hidden && meta.data.length > 0) {
@@ -299,19 +301,11 @@
                         let currentYear = currentYearGlobal, currentMonth = 1, currentDay = 1;
 
                         if (isCompareChart) {
-                            if (compareXMode === "calendar") {
-                                // Separar "DD Mes" para parsear componentes UTC de simulación lunar
-                                const parts = label.split(' ');
-                                if (parts.length === 2) {
-                                    currentDay = parseInt(parts[0]);
-                                    currentMonth = SHORT_MONTHS.indexOf(parts[1]) + 1;
-                                    currentYear = globalCompareRawData[datasetIdx] ? globalCompareRawData[datasetIdx].year : 2015;
-                                }
-                            } else if (compareXMode === "julian") {
-                                let dateFromJulian = new Date(Date.UTC(currentYear, 0, idx + 1));
-                                currentMonth = dateFromJulian.getUTCMonth() + 1; currentDay = dateFromJulian.getUTCDate();
-                                currentYear = globalCompareRawData[datasetIdx] ? globalCompareRawData[datasetIdx].year : 2015;
-                            } else { return; } 
+                            // En el gráfico comparativo, recuperamos la fecha real desde el meta del dataset
+                            if (globalCompareRawData[datasetIdx] && globalCompareRawData[datasetIdx].meta[idx]) {
+                                const dayMeta = globalCompareRawData[datasetIdx].meta[idx];
+                                currentYear = dayMeta.year; currentMonth = dayMeta.month; currentDay = dayMeta.day;
+                            } else { return; }
                         } else {
                             const parts = label.split('-');
                             if (parts.length === 3) { currentYear = parseInt(parts[0]); currentMonth = parseInt(parts[1]); currentDay = parseInt(parts[2]); }
@@ -380,13 +374,22 @@
                     x: { 
                         grid: { color: '#333' }, 
                         ticks: { 
-                            color: '#aaa', font: { size: 9 }, maxTicksLimit: 20,
+                            color: '#aaa', font: { size: 9 }, maxTicksLimit: 24,
                             callback: function(val) {
                                 const label = this.getLabelForValue(val);
+                                if (!label) return null;
+                                
                                 if (compareXMode === "calendar") {
-                                    // Filtrar tics para limpiar la densidad del eje en modo Día Mes
-                                    if (label && (label.startsWith("01 ") || label.startsWith("15 "))) {
+                                    // Filtrar tics para limpiar la densidad en modo Día Mes
+                                    if (label.startsWith("01 ") || label.startsWith("15 ")) {
                                         return label.startsWith("01 ") ? label.split(' ')[1] : label.split(' ')[0];
+                                    }
+                                    return null;
+                                }
+                                if (compareXMode === "lunar") {
+                                    // Filtrar para mostrar la etiqueta lunar solo en fases principales e hitos claros
+                                    if (label.endsWith(" 7.4") || label.endsWith(" 14.8") || label.endsWith(" 22.1") || label.endsWith(" 0.0")) {
+                                        return label.split(' ')[1];
                                     }
                                     return null;
                                 }
@@ -449,7 +452,6 @@
         return labels;
     }
 
-    // NUEVO ENFOQUE: Genera etiquetas de eje X relativas puras como "Día Mes" (Omitiendo el Año)
     function generateRelativeCalendarLabels(totalBands) {
         const labels = []; mondayIndicesGlobal = [];
         let dummyMonth = 0, dummyDay = 1;
@@ -458,14 +460,20 @@
         for (let i = 0; i < totalBands; i++) {
             const dayStr = String(dummyDay).padStart(2, '0');
             labels.push(`${dayStr} ${SHORT_MONTHS[dummyMonth]}`);
-            
-            // Aproximación de lunes para líneas verticales de cuadrícula de fondo interanual
             if (dummyDay % 7 === 1) mondayIndicesGlobal.push(i);
 
             dummyDay++;
             if (dummyDay > standardDaysInMonths[dummyMonth]) { dummyDay = 1; dummyMonth++; if (dummyMonth > 11) dummyMonth = 0; }
         }
         return labels;
+    }
+
+    // NUEVA FUNCIÓN: Genera etiquetas de Edad Lunar para cada uno de los 365 días secuenciales de un año específico
+    function generateLunarAgeLabels(seriesMeta) {
+        return seriesMeta.map(day => {
+            const age = getLunarAge(day.year, day.month, day.day);
+            return `L: ${age.toFixed(1)}`;
+        });
     }
 
     function getThermalGradientColor(value, min, max) {
@@ -562,7 +570,7 @@
         } catch (err) { printLog(`Error: ${err.message}`); }
     }
 
-    // --- SUBPANEL COMPARATIVO ---
+    // --- PIPELINE DE DESCARGA MULTIBANDA ---
     document.getElementById('btn-run-compare').addEventListener('click', async function() {
         if (!activePixelCoords) { alert("Seleccione primero un punto geográfico en el mapa del Tablero Principal."); return; }
         const checkedBoxes = document.querySelectorAll('.year-chk:checked');
@@ -602,7 +610,7 @@
         renderCompareChart();
     });
 
-    // --- MOTOR DE DISTRIBUCIÓN CROMÁTICA DIARIA DE LA COMPARATIVA ---
+    // --- RENDERIZADOR DE COMPARATIVA INTERANUAL CON PRESERVACIÓN DE CURVAS SECUENCIALES ---
     function renderCompareChart() {
         if (globalCompareRawData.length === 0) return;
         compareXMode = document.getElementById('axis-mode-select').value;
@@ -611,57 +619,35 @@
         const totals = globalCompareRawData.map(s => s.totalRain);
         const maxRain = Math.max(...totals); const minRain = Math.min(...totals);
 
+        // CORRECCIÓN: Los 3 modos usan exactamente la misma longitud secuencial de 365 días crudos
         if (compareXMode === "calendar") {
-            // CORRECCIÓN: Eje X limpio mostrando únicamente "Día Mes" sin el año prefijado
             compareChartInstance.data.labels = generateRelativeCalendarLabels(365);
-            compareChartInstance.data.datasets = globalCompareRawData.map(series => {
-                const smoothedData = applyMovingAverage(series.dailyValues.slice(0, 365), mvSize);
-                return {
-                    label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
-                    data: smoothedData, borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), backgroundColor: 'transparent', tension: 0.15
-                };
-            });
-            compareChartInstance.options.scales.x.title.text = "Mes del Año (Estructura Comparativa Regular)";
+            compareChartInstance.options.scales.x.title.text = "Mes del Año (Día Mes)";
         } 
         else if (compareXMode === "julian") {
-            compareChartInstance.data.labels = Array.from({length: 365}, (_, i) => `Día ${i + 1}`);
-            compareChartInstance.data.datasets = globalCompareRawData.map(series => {
-                const smoothedData = applyMovingAverage(series.dailyValues.slice(0, 365), mvSize);
-                return {
-                    label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
-                    data: smoothedData, borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), backgroundColor: 'transparent', tension: 0.15
-                };
-            });
-            compareChartInstance.options.scales.x.title.text = "Día Juliano del Año";
+            compareChartInstance.data.labels = Array.from({length: 365}, (_, i) => `${i + 1}`);
+            compareChartInstance.options.scales.x.title.text = "Día Juliano del Año (Contador Continuo)";
         } 
         else if (compareXMode === "lunar") {
-            // CORRECCIÓN: Agrupación robusta basada en el día del Mes Sinódico (0 a 29) para graficar lluvia diaria real
-            const lunarBins = Array.from({length: 30}, (_, i) => i);
-            compareChartInstance.data.labels = lunarBins.map(b => `Día Lunar ${b}`);
-            
-            compareChartInstance.data.datasets = globalCompareRawData.map(series => {
-                const binSums = new Array(30).fill(0);
-                const binCounts = new Array(30).fill(0);
-                
-                series.meta.forEach(dayMeta => {
-                    const lAge = getLunarAge(dayMeta.year, dayMeta.month, dayMeta.day);
-                    const binIdx = Math.floor(lAge) % 30;
-                    binSums[binIdx] += dayMeta.value;
-                    binCounts[binIdx]++;
-                });
-
-                // Calcular precipitación diaria promedio por cada día de la fase lunar
-                const rawLunarValues = binSums.map((sum, idx) => binCounts[idx] > 0 ? (sum / binCounts[idx]) : 0);
-                const smoothedLunarValues = applyMovingAverage(rawLunarValues, mvSize);
-
-                return {
-                    label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
-                    data: smoothedLunarValues, borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), backgroundColor: 'transparent', tension: 0.15
-                };
-            });
-            compareChartInstance.options.scales.x.title.text = "Día del Mes Sinódico Lunar (0 = Luna Nueva, 14.7 = Luna Llena)";
+            // CORRECCIÓN: Muestra la Edad Lunar como etiqueta para cada uno de los 365 días sin romper el orden del año
+            compareChartInstance.data.labels = generateLunarAgeLabels(globalCompareRawData[0].meta.slice(0, 365));
+            compareChartInstance.options.scales.x.title.text = "Fase Lunar en Días (0 = Nueva, 14.7 = Llena, 29.5 = Siguiente Ciclo)";
         }
+
+        // Asignar datos diarios puros (suavizados por la media móvil) con la leyenda conteniendo el acumulado total
+        compareChartInstance.data.datasets = globalCompareRawData.map(series => {
+            const smoothedData = applyMovingAverage(series.dailyValues.slice(0, 365), mvSize);
+            return {
+                label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
+                data: smoothedData, 
+                borderColor: getThermalGradientColor(series.totalRain, minRain, maxRain), 
+                backgroundColor: 'transparent', 
+                tension: 0.15
+            };
+        });
+
         compareChartInstance.update();
+        printLog(`Gráfico actualizado en modo: [Eje X -> ${compareXMode}] | [Filtro -> MA ${mvSize}D]`);
     }
 
     document.getElementById('axis-mode-select').addEventListener('change', renderCompareChart);
