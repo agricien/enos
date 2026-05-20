@@ -276,7 +276,6 @@
             ctx.save();
 
             const isCompareChart = chart.canvas.id === "compareChart";
-            // Dibujar las líneas divisorias de los lunes solo en modo calendario
             const showGridLines = !isCompareChart || (isCompareChart && compareXMode === "calendar");
 
             if (showGridLines && mondayIndicesGlobal && mondayIndicesGlobal.length > 0) {
@@ -290,7 +289,6 @@
                 });
             }
 
-            // Marcado inteligente de lunas llenas en las curvas secuenciales (365 días)
             chart.data.datasets.forEach((dataset, datasetIdx) => {
                 const meta = chart.getDatasetMeta(datasetIdx);
                 if (!meta.hidden && meta.data.length > 0) {
@@ -301,7 +299,6 @@
                         let currentYear = currentYearGlobal, currentMonth = 1, currentDay = 1;
 
                         if (isCompareChart) {
-                            // En el gráfico comparativo, recuperamos la fecha real desde el meta del dataset
                             if (globalCompareRawData[datasetIdx] && globalCompareRawData[datasetIdx].meta[idx]) {
                                 const dayMeta = globalCompareRawData[datasetIdx].meta[idx];
                                 currentYear = dayMeta.year; currentMonth = dayMeta.month; currentDay = dayMeta.day;
@@ -380,14 +377,12 @@
                                 if (!label) return null;
                                 
                                 if (compareXMode === "calendar") {
-                                    // Filtrar tics para limpiar la densidad en modo Día Mes
                                     if (label.startsWith("01 ") || label.startsWith("15 ")) {
                                         return label.startsWith("01 ") ? label.split(' ')[1] : label.split(' ')[0];
                                     }
                                     return null;
                                 }
                                 if (compareXMode === "lunar") {
-                                    // Filtrar para mostrar la etiqueta lunar solo en fases principales e hitos claros
                                     if (label.endsWith(" 7.4") || label.endsWith(" 14.8") || label.endsWith(" 22.1") || label.endsWith(" 0.0")) {
                                         return label.split(' ')[1];
                                     }
@@ -436,12 +431,14 @@
         return [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     }
 
+    // CORRECCIÓN ESPECÍFICA: Forzado simétrico a 365 días en el tablero principal para evitar desborde bisiesto
     function generateCalendarLabels(year, totalBands) {
         const labels = []; mondayIndicesGlobal = [];
         let currentYear = year, currentMonth = 0, currentDay = 1;
         const daysInMonths = getDaysInMonths(year);
+        const limitBands = Math.min(totalBands, 365); 
 
-        for (let i = 0; i < totalBands; i++) {
+        for (let i = 0; i < limitBands; i++) {
             labels.push(`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`);
             const testDate = new Date(Date.UTC(currentYear, currentMonth, currentDay));
             if (testDate.getUTCDay() === 1) mondayIndicesGlobal.push(i);
@@ -468,7 +465,6 @@
         return labels;
     }
 
-    // NUEVA FUNCIÓN: Genera etiquetas de Edad Lunar para cada uno de los 365 días secuenciales de un año específico
     function generateLunarAgeLabels(seriesMeta) {
         return seriesMeta.map(day => {
             const age = getLunarAge(day.year, day.month, day.day);
@@ -533,14 +529,17 @@
         if (!activePixelCoords || !tiffImage) return;
         try {
             const rasterData = await tiffImage.readRasters({ window: [activePixelCoords.posX, activePixelCoords.posY, activePixelCoords.posX + 1, activePixelCoords.posY + 1], interleave: false });
-            const totalBands = rasterData.length; const CHELSA_SCALE_FACTOR = 0.1;
+            const CHELSA_SCALE_FACTOR = 0.1;
             let totalAcum = 0, validDays = 0, countDry = 0, countRain = 0;
             let maxDryStreak = 0, currentDryStreak = 0, maxRainStreak = 0, currentRainStreak = 0;
             const daysInMonths = getDaysInMonths(currentYearGlobal); const monthlyTotals = new Array(12).fill(0); const monthlyValidDays = new Array(12).fill(0);
             let currentMonthIdx = 0, daysAccumulatedInCurrentMonth = 0;
             const chartDataArray = []; const dayToMonthMapping = [];
 
-            for (let i = 0; i < totalBands; i++) {
+            // Forzar análisis síncrono acotado a 365 días en tablero principal
+            const executionLimit = Math.min(rasterData.length, 365);
+
+            for (let i = 0; i < executionLimit; i++) {
                 let cellVal = rasterData[i][0];
                 if (cellVal !== null && cellVal !== -9999 && !isNaN(cellVal)) {
                     cellVal = cellVal * CHELSA_SCALE_FACTOR; if (cellVal < 0) cellVal = 0;
@@ -595,9 +594,11 @@
                 const daysInMonths = getDaysInMonths(year);
                 let currentMonth = 0, currentDay = 1;
 
-                for (let i = 0; i < totalBands; i++) {
+                // CORRECCIÓN: Limitar de forma estricta el bucle a 365 días para unificar la base decimal de la sumatoria
+                for (let i = 0; i < 365; i++) {
                     let v = rasterData[i][0];
-                    if (v !== null && v !== -9999 && !isNaN(v)) { v = v * 0.1; if (v < 0) v = 0; cumulativeSum += v; }
+                    if (v !== null && v !== -9999 && !isNaN(v)) { v = v * 0.1; if (v < 0) v = 0; } else { v = 0; }
+                    cumulativeSum += v; 
                     dailyRainArray.push(v); 
                     metaDates.push({ year, month: currentMonth + 1, day: currentDay, value: v });
                     
@@ -610,7 +611,6 @@
         renderCompareChart();
     });
 
-    // --- RENDERIZADOR DE COMPARATIVA INTERANUAL CON PRESERVACIÓN DE CURVAS SECUENCIALES ---
     function renderCompareChart() {
         if (globalCompareRawData.length === 0) return;
         compareXMode = document.getElementById('axis-mode-select').value;
@@ -619,7 +619,6 @@
         const totals = globalCompareRawData.map(s => s.totalRain);
         const maxRain = Math.max(...totals); const minRain = Math.min(...totals);
 
-        // CORRECCIÓN: Los 3 modos usan exactamente la misma longitud secuencial de 365 días crudos
         if (compareXMode === "calendar") {
             compareChartInstance.data.labels = generateRelativeCalendarLabels(365);
             compareChartInstance.options.scales.x.title.text = "Mes del Año (Día Mes)";
@@ -629,14 +628,12 @@
             compareChartInstance.options.scales.x.title.text = "Día Juliano del Año (Contador Continuo)";
         } 
         else if (compareXMode === "lunar") {
-            // CORRECCIÓN: Muestra la Edad Lunar como etiqueta para cada uno de los 365 días sin romper el orden del año
             compareChartInstance.data.labels = generateLunarAgeLabels(globalCompareRawData[0].meta.slice(0, 365));
             compareChartInstance.options.scales.x.title.text = "Fase Lunar en Días (0 = Nueva, 14.7 = Llena, 29.5 = Siguiente Ciclo)";
         }
 
-        // Asignar datos diarios puros (suavizados por la media móvil) con la leyenda conteniendo el acumulado total
         compareChartInstance.data.datasets = globalCompareRawData.map(series => {
-            const smoothedData = applyMovingAverage(series.dailyValues.slice(0, 365), mvSize);
+            const smoothedData = applyMovingAverage(series.dailyValues, mvSize);
             return {
                 label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
                 data: smoothedData, 
