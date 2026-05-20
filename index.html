@@ -8,21 +8,23 @@
     <style>
         :root { --bg-dark: #202020; --container-bg: #2d2d2d; --border-color: #555555; --accent-purple: #9C27B0; }
         body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background-color: var(--bg-dark); color: #ffffff; }
-        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1500px; margin: 0 auto; }
-        @media (max-width: 900px) { .dashboard { grid-template-columns: 1fr; } }
+        .dashboard { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px; max-width: 1600px; margin: 0 auto; }
+        @media (max-width: 1000px) { .dashboard { grid-template-columns: 1fr; } }
         .panel { background: var(--container-bg); border-radius: 8px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 15px; }
-        h2 { margin-top: 0; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; font-size: 14pt; }
-        #map { height: 450px; width: 100%; border-radius: 6px; border: 1px solid var(--border-color); }
+        h2 { margin-top: 0; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; font-size: 13pt; letter-spacing: 0.5px; color: #e0e0e0; }
+        #map { height: 500px; width: 100%; border-radius: 6px; border: 1px solid var(--border-color); background: #151515; }
         select { width: 100%; padding: 12px; border-radius: 6px; background: #383838; color: white; border: 1px solid var(--border-color); font-size: 11pt; }
-        .result-box { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; }
-        #console-log { width: 100%; height: 120px; font-family: 'Courier New', monospace; font-size: 9pt; background: #111111; color: #00ff00; padding: 10px; box-sizing: border-box; border-radius: 4px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #444; }
+        .result-box { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; display: flex; flex-direction: column; gap: 12px; }
+        #console-log { width: 100%; height: 100px; font-family: 'Courier New', monospace; font-size: 9pt; background: #111111; color: #00ff00; padding: 10px; box-sizing: border-box; border-radius: 4px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #444; }
         
-        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
-        .stat-card { background: #333; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #444; }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .stat-card { background: #2a2a2a; padding: 10px 12px; border-radius: 6px; border: 1px solid #444; }
         .stat-card.blue { border-left: 4px solid #1565C0; }
         .stat-card.orange { border-left: 4px solid #E65100; }
-        .stat-name { font-size: 9pt; color: #aaa; }
-        .stat-val { font-size: 16pt; font-weight: bold; color: #00ff00; margin-top: 5px; }
+        .stat-card.green { border-left: 4px solid #2E7D32; }
+        .stat-card.purple { border-left: 4px solid #6A1B9A; }
+        .stat-name { font-size: 8.5pt; color: #b0b0b0; text-transform: uppercase; font-weight: 600; }
+        .stat-val { font-size: 14pt; font-weight: bold; color: #00ff00; margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -38,10 +40,11 @@
     </div>
 
     <div class="panel">
-        <h2>2. Análisis Estadístico del Píxel (Factor de Escala 0.1 Aplicado)</h2>
-        <div id="click-coords" style="color: #aaa;">Coordenadas: Seleccione un punto en el mapa de Costa Rica...</div>
+        <h2>2. Diagnóstico Climático Avanzado del Píxel</h2>
+        <div id="click-coords" style="color: #aaa; font-size: 10pt;">Coordenadas: Seleccione un punto en el mapa...</div>
+        
         <div class="result-box">
-            <div style="font-weight: bold; color: #ccc; margin-bottom: 5px;">Métricas calibradas para la celda seleccionada:</div>
+            <h3 style="margin: 0; font-size: 10.5pt; color: #888; border-bottom: 1px solid #333; padding-bottom: 4px;">Métricas Generales Anuales</h3>
             <div class="stats-grid">
                 <div class="stat-card blue">
                     <div class="stat-name">Σ Acumulado Anual</div>
@@ -51,17 +54,47 @@
                     <div class="stat-name">⌀ Promedio Diario</div>
                     <div class="stat-val" id="stat-prom">—</div>
                 </div>
-                <div class="stat-card orange">
-                    <div class="stat-name">↑ Máximo Diario (Pico)</div>
-                    <div class="stat-val" id="stat-max">—</div>
+            </div>
+
+            <h3 style="margin: 5px 0 0 0; font-size: 10.5pt; color: #888; border-bottom: 1px solid #333; padding-bottom: 4px;">Análisis de Frecuencias (Días)</h3>
+            <div class="stats-grid">
+                <div class="stat-card green">
+                    <div class="stat-name">Días con Lluvia</div>
+                    <div class="stat-val" id="stat-days-rain">—</div>
                 </div>
                 <div class="stat-card orange">
-                    <div class="stat-name">↓ Mínimo Diario</div>
-                    <div class="stat-val" id="stat-min">—</div>
+                    <div class="stat-name">Días Secos</div>
+                    <div class="stat-val" id="stat-days-dry">—</div>
                 </div>
             </div>
-            <div id="raster-bands-info" style="font-size: 9pt; color: #aaa; margin-top: 12px; text-align: center;"></div>
+
+            <h3 style="margin: 5px 0 0 0; font-size: 10.5pt; color: #888; border-bottom: 1px solid #333; padding-bottom: 4px;">Rachas Continuas Máximas</h3>
+            <div class="stats-grid">
+                <div class="stat-card orange">
+                    <div class="stat-name">Período Seco Continuo</div>
+                    <div class="stat-val" id="stat-streak-dry">—</div>
+                </div>
+                <div class="stat-card green">
+                    <div class="stat-name">Período Lluvioso Continuo</div>
+                    <div class="stat-val" id="stat-streak-rain">—</div>
+                </div>
+            </div>
+
+            <h3 style="margin: 5px 0 0 0; font-size: 10.5pt; color: #888; border-bottom: 1px solid #333; padding-bottom: 4px;">Estacionalidad Mensual Agregada</h3>
+            <div class="stats-grid">
+                <div class="stat-card purple">
+                    <div class="stat-name">Mes Más Seco</div>
+                    <div class="stat-val" id="stat-month-dry">—</div>
+                </div>
+                <div class="stat-card purple">
+                    <div class="stat-name">Mes Más Lluvioso</div>
+                    <div class="stat-val" id="stat-month-rain">—</div>
+                </div>
+            </div>
+
+            <div id="raster-bands-info" style="font-size: 8.5pt; color: #888; margin-top: 5px; text-align: center;"></div>
         </div>
+        
         <h2>Consola del Pipeline Geoespacial</h2>
         <div id="console-log">Entorno web inicializado.</div>
     </div>
@@ -76,15 +109,16 @@
     const BRANCH = "main";
     
     const YEARS = [2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2020,2021,2022,2023,2024,2025];
+    const MONTH_NAMES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-    const map = L.map('map').setView([9.7489, -83.7534], 8);
+    const map = L.map('map').setView([9.6, -84.0], 8);
     let activeMarker = null;
-    let currentBBoxLayer = null;
-    let tiffInstance = null;
     let tiffImage = null;
     let rasterBounds = null; 
     let rasterWidth = 0;
     let rasterHeight = 0;
+    let boundsConfigured = false; 
+    let currentYearGlobal = 2015;
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
@@ -96,35 +130,54 @@
             opt.text = `Año ${y} (Daily Stack)`;
             selectEl.appendChild(opt);
         });
-        
-        // Seleccionar 2015 por defecto para verificación del evento ENOS
         selectEl.value = "CHELSA_prec_2015_stack.tif";
+        extractYear(selectEl.value);
         initRemoteTiff(selectEl.value);
+    }
+
+    function extractYear(fileName) {
+        const match = fileName.match(/_(\d{4})_/);
+        currentYearGlobal = match ? parseInt(match[1]) : 2015;
+    }
+
+    // Retorna la distribución exacta de días por mes según el año
+    function getDaysInMonths(year) {
+        const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+        return [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     }
 
     async function initRemoteTiff(fileName) {
         if (!fileName) return;
-        printLog(`Conectando al stream binario via GitHub LFS Gateway...`);
+        extractYear(fileName);
+        printLog(`Estableciendo pasarela con stream binario de: ${fileName}`);
         
         const rawUrl = `https://media.githubusercontent.com/media/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${fileName}`;
 
         try {
-            tiffInstance = await GeoTIFF.fromUrl(rawUrl, { forceCSPIsolation: true });
+            const tiffInstance = await GeoTIFF.fromUrl(rawUrl, { forceCSPIsolation: true });
             tiffImage = await tiffInstance.getImage();
 
             rasterWidth = tiffImage.getWidth();
             rasterHeight = tiffImage.getHeight();
             rasterBounds = tiffImage.getBoundingBox();
 
-            printLog(`¡Cabecera GeoTIFF decodificada con éxito!`);
+            printLog(`Metadatos GeoTIFF decodificados.`);
 
-            if (currentBBoxLayer) map.removeLayer(currentBBoxLayer);
-            const boundsLeaflet = [[rasterBounds[1], rasterBounds[0]], [rasterBounds[3], rasterBounds[2]]];
-            currentBBoxLayer = L.rectangle(boundsLeaflet, {color: "#9C27B0", weight: 1.5, fillOpacity: 0.05}).addTo(map);
-            map.fitBounds(boundsLeaflet);
+            // Restringir la vista del mapa SOLO la primera vez que se carga la aplicación
+            if (!boundsConfigured) {
+                const padding = 0.05;
+                const southWest = L.latLng(rasterBounds[1] - padding, rasterBounds[0] - padding);
+                const northEast = L.latLng(rasterBounds[3] + padding, rasterBounds[2] + padding);
+                const strictBounds = L.latLngBounds(southWest, northEast);
+                
+                map.setMaxBounds(strictBounds);
+                map.fitBounds(strictBounds);
+                boundsConfigured = true;
+                printLog(`Restricción de área activa: Vista confinada a la extensión de Costa Rica.`);
+            }
 
         } catch (err) {
-            printLog(`Error de lectura: ${err.message}`);
+            printLog(`Error de lectura remota: ${err.message}`);
         }
     }
 
@@ -133,23 +186,24 @@
     map.on('click', async function(e) {
         const lat = e.latlng.lat;
         const lng = e.latlng.lng;
-        document.getElementById('click-coords').innerHTML = `<b>Coordenadas:</b> Lat: ${lat.toFixed(5)}, Lon: ${lng.toFixed(5)}`;
+
+        if (!tiffImage || !rasterBounds) return;
+
+        // Validar geográficamente si el clic cae dentro de la matriz del raster
+        if (lng < rasterBounds[0] || lng > rasterBounds[2] || lat < rasterBounds[1] || lat > rasterBounds[3]) {
+            printLog("Clic fuera del área de cobertura del GeoTIFF.");
+            return;
+        }
+
+        document.getElementById('click-coords').innerHTML = `<b>Coordenadas del Píxel:</b> Lat: ${lat.toFixed(5)}, Lon: ${lng.toFixed(5)}`;
 
         if (activeMarker) map.removeLayer(activeMarker);
         activeMarker = L.marker([lat, lng]).addTo(map);
 
-        if (!tiffImage || !rasterBounds) return;
-
-        if (lng < rasterBounds[0] || lng > rasterBounds[2] || lat < rasterBounds[1] || lat > rasterBounds[3]) {
-            printLog("Fuera de la cobertura del raster.");
-            clearValues();
-            return;
-        }
-
         const posX = Math.floor(((lng - rasterBounds[0]) / (rasterBounds[2] - rasterBounds[0])) * rasterWidth);
         const posY = Math.floor(((rasterBounds[3] - lat) / (rasterBounds[3] - rasterBounds[1])) * rasterHeight);
 
-        printLog(`Calculando índices matriciales: Columna ${posX}, Fila ${posY}...`);
+        printLog(`Extrayendo datos de grilla [Col: ${posX}, Fila: ${posY}]...`);
 
         try {
             const rasterData = await tiffImage.readRasters({ 
@@ -158,53 +212,115 @@
             });
             
             const totalBands = rasterData.length;
-            let totalAcum = 0;
-            let maxVal = -Infinity;
-            let minVal = Infinity;
-            let validDays = 0;
-
-            // Constante del factor de escala oficial de CHELSA Prec (v2.1)
             const CHELSA_SCALE_FACTOR = 0.1;
+
+            let totalAcum = 0;
+            let validDays = 0;
+            let countDry = 0;
+            let countRain = 0;
+
+            // Variables para el cálculo de rachas continuas
+            let maxDryStreak = 0;
+            let currentDryStreak = 0;
+            let maxRainStreak = 0;
+            let currentRainStreak = 0;
+
+            // Arrays para estructurar acumulación por meses
+            const daysInMonths = getDaysInMonths(currentYearGlobal);
+            const monthlyTotals = new Array(12).fill(0);
+            const monthlyValidDays = new Array(12).fill(0);
+
+            let currentMonthIdx = 0;
+            let daysAccumulatedInCurrentMonth = 0;
 
             for (let i = 0; i < totalBands; i++) {
                 let cellVal = rasterData[i][0];
                 
-                if (cellVal !== null && cellVal !== -9999 && !isNaN(cellVal) && cellVal >= 0) {
-                    // Aplicar el factor de escala decimal antes del cálculo estadístico
+                if (cellVal !== null && cellVal !== -9999 && !isNaN(cellVal)) {
                     cellVal = cellVal * CHELSA_SCALE_FACTOR;
+                    if (cellVal < 0) cellVal = 0; // Corrección de límites inferiores espurios
 
                     totalAcum += cellVal;
-                    if (cellVal > maxVal) maxVal = cellVal;
-                    if (cellVal < minVal) minVal = cellVal;
                     validDays++;
+
+                    // 1. Clasificación y conteo de días
+                    if (cellVal === 0) {
+                        countDry++;
+                        // Lógica de racha seca
+                        currentDryStreak++;
+                        if (currentDryStreak > maxDryStreak) maxDryStreak = currentDryStreak;
+                        // Romper racha lluviosa
+                        currentRainStreak = 0;
+                    } else {
+                        countRain++;
+                        // Lógica de racha lluviosa
+                        currentRainStreak++;
+                        if (currentRainStreak > maxRainStreak) maxRainStreak = currentRainStreak;
+                        // Romper racha seca
+                        currentDryStreak = 0;
+                    }
+
+                    // 2. Agregación temporal por meses naturales
+                    monthlyTotals[currentMonthIdx] += cellVal;
+                    monthlyValidDays[currentMonthIdx]++;
+                    
+                    daysAccumulatedInCurrentMonth++;
+                    if (daysAccumulatedInCurrentMonth >= daysInMonths[currentMonthIdx]) {
+                        currentMonthIdx++;
+                        daysAccumulatedInCurrentMonth = 0;
+                    }
                 }
             }
 
             if (validDays === 0) {
                 clearValues();
-                document.getElementById('raster-bands-info').innerText = "Celda sin datos válidos (NoData).";
+                document.getElementById('raster-bands-info').innerText = "Celda ubicada en zona marítima o sin datos.";
                 return;
+            }
+
+            // Determinar extremos mensuales (Mes más seco / más lluvioso)
+            let maxMonthVal = -Infinity;
+            let minMonthVal = Infinity;
+            let bestMonthIdx = 0;
+            let worstMonthIdx = 0;
+
+            for (let m = 0; m < 12; m++) {
+                if (monthlyValidDays[m] > 0) {
+                    const mVal = monthlyTotals[m];
+                    if (mVal > maxMonthVal) { maxMonthVal = mVal; bestMonthIdx = m; }
+                    if (mVal < minMonthVal) { minMonthVal = mVal; worstMonthIdx = m; }
+                }
             }
 
             const promedio = totalAcum / validDays;
 
+            // Renderizado de métricas avanzadas en el Dashboard
             document.getElementById('stat-acum').innerText = `${totalAcum.toFixed(1)} mm`;
             document.getElementById('stat-prom').innerText = `${promedio.toFixed(2)} mm/d`;
-            document.getElementById('stat-max').innerText = `${maxVal.toFixed(2)} mm`;
-            document.getElementById('stat-min').innerText = `${minVal.toFixed(2)} mm`;
-            document.getElementById('raster-bands-info').innerText = `Serie procesada: ${validDays} días analizados con factor de escala 0.1`;
+            document.getElementById('stat-days-rain').innerText = `${countRain} días`;
+            document.getElementById('stat-days-dry').innerText = `${countDry} días`;
+            document.getElementById('stat-streak-dry').innerText = `${maxDryStreak} días seguidos`;
+            document.getElementById('stat-streak-rain').innerText = `${maxRainStreak} días seguidos`;
+            document.getElementById('stat-month-dry').innerText = `${MONTH_NAMES[worstMonthIdx]} (${maxMonthVal === minMonthVal ? '0.0' : minMonthVal.toFixed(1)} mm)`;
+            document.getElementById('stat-month-rain').innerText = `${MONTH_NAMES[bestMonthIdx]} (${maxMonthVal.toFixed(1)} mm)`;
+            
+            document.getElementById('raster-bands-info').innerText = `Procesamiento exitoso: ${validDays} capas analizadas de forma síncrona.`;
+            printLog(`Análisis estadístico e indicadores de extremos climáticos completos.`);
 
-            printLog(`Extracción temporal de la grilla diaria completada.`);
         } catch (err) {
-            printLog(`Error al decodificar la serie de tiempo: ${err.message}`);
+            printLog(`Error al procesar series de tiempo: ${err.message}`);
         }
     });
 
     function clearValues() {
         document.getElementById('stat-acum').innerText = "—";
         document.getElementById('stat-prom').innerText = "—";
-        document.getElementById('stat-max').innerText = "—";
-        document.getElementById('stat-min').innerText = "—";
+        document.getElementById('stat-days-rain').innerText = "—";
+        document.getElementById('stat-days-dry').innerText = "—";
+        document.getElementById('stat-streak-dry').innerText = "—";
+        document.getElementById('stat-streak-rain').innerText = "—";
+        document.getElementById('stat-month-dry').innerText = "—";
+        document.getElementById('stat-month-rain').innerText = "—";
         document.getElementById('raster-bands-info').innerText = "";
     }
 
