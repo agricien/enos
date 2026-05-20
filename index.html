@@ -11,6 +11,7 @@
             --container-bg: #2d2d2d; 
             --border-color: #555555; 
             --accent-purple: #9C27B0; 
+            --accent-purple-hover: #7B1FA2;
         }
         
         * {
@@ -25,6 +26,56 @@
             color: #ffffff; 
         }
 
+        /* Barra de navegación superior para el Logo y Botón About */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1600px;
+            margin: 0 auto 15px auto;
+            background: var(--container-bg);
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            border: 1px solid var(--border-color);
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            height: 40px;
+            width: auto;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+
+        .brand-title {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #ffffff;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-about {
+            background: var(--accent-purple);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 10pt;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .btn-about:hover {
+            background: var(--accent-purple-hover);
+        }
+
         .dashboard { 
             display: grid; 
             grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); 
@@ -36,6 +87,11 @@
         @media (max-width: 500px) {
             .dashboard {
                 grid-template-columns: 1fr;
+            }
+            .navbar {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
             }
         }
 
@@ -138,9 +194,115 @@
             height: 320px; 
             width: 100%; 
         }
+
+        /* Estilos de la Ventana Modal (About) */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: var(--container-bg);
+            border: 1px solid var(--border-color);
+            padding: 25px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+            margin-bottom: 15px;
+        }
+
+        .modal-logo {
+            height: 50px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .modal-title {
+            margin: 0;
+            font-size: 14pt;
+            color: #ffffff;
+        }
+
+        .modal-body {
+            font-size: 10.5pt;
+            line-height: 1.5;
+            color: #dddddd;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .modal-meta-label {
+            font-size: 9pt;
+            color: #888888;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .modal-meta-val {
+            color: #ffffff;
+            font-size: 10pt;
+        }
+
+        .modal-meta-val a {
+            color: #00E5FF;
+            text-decoration: none;
+        }
+        .modal-meta-val a:hover {
+            text-decoration: underline;
+        }
+
+        .btn-close-modal {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 16pt;
+            cursor: pointer;
+        }
+        .btn-close-modal:hover {
+            color: #fff;
+        }
     </style>
 </head>
 <body>
+
+<div class="navbar">
+    <div class="brand-container">
+        <img src="AgriCien_Logo_Sencillo.webp" alt="AgriCien Clima" class="brand-logo" onerror="this.style.display='none';">
+        <span class="brand-title">AgriCien Clima - ENOS</span>
+    </div>
+    <button class="btn-about" id="openAbout">Acerca de</button>
+</div>
 
 <div class="dashboard">
     <div class="panel">
@@ -217,6 +379,31 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="aboutModal">
+    <div class="modal-content">
+        <button class="btn-close-modal" id="closeAbout">&times;</button>
+        <div class="modal-header">
+            <img src="AgriCien_Logo_Sencillo.webp" alt="Logo" class="modal-logo" onerror="this.style.display='none';">
+            <h3 class="modal-title">AgriCien Clima - ENOS</h3>
+        </div>
+        <div class="modal-body">
+            <p style="margin:0 0 10px 0;">Herramienta integral para descarga y análisis de datos climáticos históricos de Costa Rica. Fuente CHELSA.</p>
+            
+            <div>
+                <div class="modal-meta-label">Product Manager / Owner</div>
+                <div class="modal-meta-val">Edgar Méndez Durán</div>
+                <div class="modal-meta-val" style="font-size: 9pt;">
+                    <a href="mailto:edgar.mendez@agricien.com">edgar.mendez@agricien.com</a> | <a href="mailto:edgar@geociencias.net">edgar@geociencias.net</a>
+                </div>
+            </div>
+
+            <div style="margin-top: 10px; border-top: 1px solid #444; padding-top: 10px; font-size: 9pt; color: #aaa; text-align: center;">
+                Desarrollo: © 2026 AgriCien S.A., Costa Rica
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -226,7 +413,6 @@
     const REPO_NAME = "enos";
     const BRANCH = "main";
     
-    // Lista de enlaces fijos que incluye los nuevos años históricos cargados
     const YEARS = [1982,1983,1997,1998,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2020,2021,2022,2023,2024,2025];
     const MONTH_NAMES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const SHORT_MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -244,6 +430,12 @@
     let mondayIndicesGlobal = [];
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+    // Lógica del Modal (About)
+    const modal = document.getElementById('aboutModal');
+    document.getElementById('openAbout').addEventListener('click', () => modal.classList.add('active'));
+    document.getElementById('closeAbout').addEventListener('click', () => modal.classList.remove('active'));
+    modal.addEventListener('click', (e) => { if(e.target === modal) modal.classList.remove('active'); });
 
     const mondayLinesPlugin = {
         id: 'mondayLines',
