@@ -14,19 +14,9 @@
             --accent-purple-hover: #7B1FA2;
         }
         
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 15px; background-color: var(--bg-dark); color: #ffffff; }
 
-        body { 
-            font-family: 'Segoe UI', sans-serif; 
-            margin: 0; 
-            padding: 15px; 
-            background-color: var(--bg-dark); 
-            color: #ffffff; 
-        }
-
-        /* Barra de navegación superior para el Logo y Botón About */
         .navbar {
             display: flex;
             justify-content: space-between;
@@ -40,41 +30,17 @@
             border: 1px solid var(--border-color);
         }
 
-        .brand-container {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+        .brand-container { display: flex; align-items: center; gap: 12px; }
+        .brand-logo { height: 40px; width: auto; object-fit: contain; border-radius: 4px; }
+        .brand-title { font-size: 14pt; font-weight: bold; color: #ffffff; letter-spacing: 0.5px; }
+        
+        .nav-controls { display: flex; gap: 10px; }
+        .btn-nav { background: #383838; color: white; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; font-size: 10pt; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-nav:hover, .btn-nav.active { background: var(--accent-purple); border-color: var(--accent-purple); }
 
-        .brand-logo {
-            height: 40px;
-            width: auto;
-            object-fit: contain;
-            border-radius: 4px;
-        }
-
-        .brand-title {
-            font-size: 14pt;
-            font-weight: bold;
-            color: #ffffff;
-            letter-spacing: 0.5px;
-        }
-
-        .btn-about {
-            background: var(--accent-purple);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 10pt;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s ease;
-        }
-
-        .btn-about:hover {
-            background: var(--accent-purple-hover);
-        }
+        /* Vistas virtuales (Tabs) */
+        .tab-view { display: none; }
+        .tab-view.active { display: grid; }
 
         .dashboard { 
             display: grid; 
@@ -84,100 +50,21 @@
             margin: 0 auto; 
         }
         
-        @media (max-width: 500px) {
-            .dashboard {
-                grid-template-columns: 1fr;
-            }
-            .navbar {
-                flex-direction: column;
-                gap: 10px;
-                text-align: center;
-            }
-        }
+        @media (max-width: 500px) { .dashboard { grid-template-columns: 1fr; } .navbar { flex-direction: column; gap: 10px; text-align: center; } }
 
-        .panel { 
-            background: var(--container-bg); 
-            border-radius: 8px; 
-            padding: 20px; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
-            display: flex; 
-            flex-direction: column; 
-            gap: 15px; 
-            min-width: 0; 
-        }
+        .panel { background: var(--container-bg); border-radius: 8px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 15px; min-width: 0; }
+        h2 { margin-top: 0; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; font-size: 13pt; letter-spacing: 0.5px; color: #e0e0e0; }
 
-        h2 { 
-            margin-top: 0; 
-            border-bottom: 2px solid var(--border-color); 
-            padding-bottom: 8px; 
-            font-size: 13pt; 
-            letter-spacing: 0.5px; 
-            color: #e0e0e0; 
-        }
+        #map { height: 450px; width: 100%; border-radius: 6px; border: 1px solid var(--border-color); background: #151515; }
+        select, .btn-action { width: 100%; padding: 12px; border-radius: 6px; background: #383838; color: white; border: 1px solid var(--border-color); font-size: 11pt; outline: none; }
+        .btn-action { background: var(--accent-purple); font-weight: bold; cursor: pointer; border: none; transition: background 0.2s; }
+        .btn-action:hover { background: var(--accent-purple-hover); }
 
-        #map { 
-            height: 450px; 
-            width: 100%; 
-            border-radius: 6px; 
-            border: 1px solid var(--border-color); 
-            background: #151515; 
-        }
-
-        select { 
-            width: 100%; 
-            padding: 12px; 
-            border-radius: 6px; 
-            background: #383838; 
-            color: white; 
-            border: 1px solid var(--border-color); 
-            font-size: 11pt; 
-            outline: none;
-        }
+        .result-box { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; display: flex; flex-direction: column; gap: 12px; width: 100%; }
+        #console-log { width: 100%; height: 100px; font-family: 'Courier New', monospace; font-size: 9pt; background: #111111; color: #00ff00; padding: 10px; border-radius: 4px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #444; }
         
-        select:focus {
-            border-color: var(--accent-purple);
-        }
-
-        .result-box { 
-            background: #1e1e1e; 
-            border: 1px solid var(--border-color); 
-            border-radius: 6px; 
-            padding: 15px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 12px; 
-            width: 100%;
-        }
-
-        #console-log { 
-            width: 100%; 
-            height: 100px; 
-            font-family: 'Courier New', monospace; 
-            font-size: 9pt; 
-            background: #111111; 
-            color: #00ff00; 
-            padding: 10px; 
-            border-radius: 4px; 
-            overflow-y: auto; 
-            white-space: pre-wrap; 
-            border: 1px solid #444; 
-        }
-        
-        .stats-grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
-            gap: 10px; 
-            width: 100%;
-        }
-
-        .stat-card { 
-            background: #2a2a2a; 
-            padding: 10px 12px; 
-            border-radius: 6px; 
-            border: 1px solid #444; 
-            transition: background-color 0.3s, color 0.3s; 
-        }
-
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; width: 100%; }
+        .stat-card { background: #2a2a2a; padding: 10px 12px; border-radius: 6px; border: 1px solid #444; }
         .stat-card.blue { border-left: 4px solid #1565C0; }
         .stat-card.orange { border-left: 4px solid #E65100; }
         .stat-card.green { border-left: 4px solid #2E7D32; }
@@ -185,113 +72,25 @@
         .stat-name { font-size: 8.5pt; color: #b0b0b0; text-transform: uppercase; font-weight: 600; }
         .stat-val { font-size: 13pt; font-weight: bold; color: #00ff00; margin-top: 4px; word-break: break-all; }
         
-        .chart-container { 
-            background: #1e1e1e; 
-            border: 1px solid var(--border-color); 
-            border-radius: 6px; 
-            padding: 15px; 
-            position: relative; 
-            height: 320px; 
-            width: 100%; 
-        }
+        .chart-container { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; position: relative; height: 340px; width: 100%; }
 
-        /* Estilos de la Ventana Modal (About) */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.75);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.25s ease;
-        }
+        /* Contenedor Checkboxes Comparativa */
+        .checkbox-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; max-height: 180px; overflow-y: auto; background: #1e1e1e; padding: 15px; border-radius: 6px; border: 1px solid var(--border-color); }
+        .checkbox-item { display: flex; align-items: center; gap: 8px; font-size: 10pt; cursor: pointer; }
+        .checkbox-item input { cursor: pointer; width: 16px; height: 16px; accent-color: var(--accent-purple); }
 
-        .modal-overlay.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .modal-content {
-            background: var(--container-bg);
-            border: 1px solid var(--border-color);
-            padding: 25px;
-            border-radius: 8px;
-            max-width: 500px;
-            width: 90%;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
-            position: relative;
-        }
-
-        .modal-header {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 12px;
-            margin-bottom: 15px;
-        }
-
-        .modal-logo {
-            height: 50px;
-            width: auto;
-            object-fit: contain;
-        }
-
-        .modal-title {
-            margin: 0;
-            font-size: 14pt;
-            color: #ffffff;
-        }
-
-        .modal-body {
-            font-size: 10.5pt;
-            line-height: 1.5;
-            color: #dddddd;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .modal-meta-label {
-            font-size: 9pt;
-            color: #888888;
-            text-transform: uppercase;
-            font-weight: 600;
-            margin-bottom: 2px;
-        }
-
-        .modal-meta-val {
-            color: #ffffff;
-            font-size: 10pt;
-        }
-
-        .modal-meta-val a {
-            color: #00E5FF;
-            text-decoration: none;
-        }
-        .modal-meta-val a:hover {
-            text-decoration: underline;
-        }
-
-        .btn-close-modal {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: none;
-            border: none;
-            color: #aaa;
-            font-size: 16pt;
-            cursor: pointer;
-        }
-        .btn-close-modal:hover {
-            color: #fff;
-        }
+        /* Estilos Ventana Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.75); display: flex; justify-content: center; align-items: center; z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-content { background: var(--container-bg); border: 1px solid var(--border-color); padding: 25px; border-radius: 8px; max-width: 500px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.6); position: relative; }
+        .modal-header { display: flex; align-items: center; gap: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 15px; }
+        .modal-logo { height: 40px; width: auto; object-fit: contain; }
+        .modal-title { margin: 0; font-size: 14pt; color: #ffffff; }
+        .modal-body { font-size: 10.5pt; line-height: 1.5; color: #dddddd; display: flex; flex-direction: column; gap: 12px; }
+        .modal-meta-label { font-size: 9pt; color: #888888; text-transform: uppercase; font-weight: 600; }
+        .modal-meta-val { color: #ffffff; font-size: 10pt; }
+        .modal-meta-val a { color: #00E5FF; text-decoration: none; }
+        .btn-close-modal { position: absolute; top: 15px; right: 15px; background: none; border: none; color: #aaa; font-size: 16pt; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -301,10 +100,14 @@
         <img src="AgriCien_Logo_Sencillo.webp" alt="AgriCien Clima" class="brand-logo" onerror="this.style.display='none';">
         <span class="brand-title">AgriCien Clima - ENOS</span>
     </div>
-    <button class="btn-about" id="openAbout">Acerca de</button>
+    <div class="nav-controls">
+        <button class="btn-nav active" data-target="view-main">Tablero Principal</button>
+        <button class="btn-nav" data-target="view-compare">Comparar Años</button>
+        <button class="btn-nav" id="openAbout">Acerca de</button>
+    </div>
 </div>
 
-<div class="dashboard">
+<div class="dashboard tab-view active" id="view-main">
     <div class="panel">
         <h2>1. Serie Temporal de Precipitación Diaria (CHELSA)</h2>
         <div>
@@ -312,7 +115,6 @@
             <select id="layer-select"></select>
         </div>
         <div id="map"></div>
-        
         <div class="chart-container">
             <canvas id="dailyChart"></canvas>
         </div>
@@ -320,8 +122,7 @@
 
     <div class="panel">
         <h2>2. Diagnóstico Climático Avanzado del Píxel</h2>
-        <div id="click-coords" style="color: #aaa; font-size: 10pt;">Coordenadas: Seleccione un punto en el mapa...</div>
-        
+        <div id="click-coords" style="color: #aaa; font-size: 10pt;">Coordenadas: Seleccione un punto en el mapa de Costa Rica...</div>
         <div class="result-box">
             <h3 style="margin: 0; font-size: 10.5pt; color: #888; border-bottom: 1px solid #333; padding-bottom: 4px;">Métricas Generales Anuales</h3>
             <div class="stats-grid">
@@ -334,7 +135,6 @@
                     <div class="stat-val" id="stat-prom">—</div>
                 </div>
             </div>
-
             <h3 style="margin: 5px 0 0 0; font-size: 10.5pt; color: #888; border-bottom: 1px solid #333; padding-bottom: 4px;">Análisis de Frecuencias (Días)</h3>
             <div class="stats-grid">
                 <div class="stat-card green">
@@ -346,7 +146,6 @@
                     <div class="stat-val" id="stat-days-dry">—</div>
                 </div>
             </div>
-
             <h3 style="margin: 5px 0 0 0; font-size: 10.5pt; color: #888; border-bottom: 1px solid #333; padding-bottom: 4px;">Rachas Continuas Máximas</h3>
             <div class="stats-grid">
                 <div class="stat-card orange">
@@ -358,7 +157,6 @@
                     <div class="stat-val" id="stat-streak-rain">—</div>
                 </div>
             </div>
-
             <h3 style="margin: 5px 0 0 0; font-size: 10.5pt; color: #888; border-bottom: 1px solid #333; padding-bottom: 4px;">Estacionalidad Mensual Agregada</h3>
             <div class="stats-grid">
                 <div class="stat-card dynamic-blue" id="card-month-dry">
@@ -370,12 +168,25 @@
                     <div class="stat-val" id="stat-month-rain">—</div>
                 </div>
             </div>
-
             <div id="raster-bands-info" style="font-size: 8.5pt; color: #888; margin-top: 5px; text-align: center;"></div>
         </div>
-        
         <h2>Consola del Pipeline Geoespacial</h2>
         <div id="console-log">Entorno web inicializado.</div>
+    </div>
+</div>
+
+<div class="dashboard tab-view" id="view-compare">
+    <div class="panel">
+        <h2>1. Selección de Coberturas para Comparación</h2>
+        <p style="font-size: 9.5pt; color: #aaa; margin: 0;">Marque las series anuales que desea cruzar. Los datos se extraerán del punto activo del mapa.</p>
+        <div class="checkbox-container" id="compare-checkboxes"></div>
+        <button class="btn-action" id="btn-run-compare">Graficar Comparativa</button>
+    </div>
+    <div class="panel">
+        <h2>2. Tendencia Interanual Combinada (Fases Lunares Señaladas)</h2>
+        <div class="chart-container" style="height: 420px;">
+            <canvas id="compareChart"></canvas>
+        </div>
     </div>
 </div>
 
@@ -387,8 +198,7 @@
             <h3 class="modal-title">AgriCien Clima - ENOS</h3>
         </div>
         <div class="modal-body">
-            <p style="margin:0 0 10px 0;">Herramienta integral para descarga y análisis de datos climáticos históricos de Costa Rica. Fuente CHELSA.</p>
-            
+            <p>Herramienta integral para descarga y análisis de datos climáticos históricos de Costa Rica. Fuente CHELSA.</p>
             <div>
                 <div class="modal-meta-label">Product Manager / Owner</div>
                 <div class="modal-meta-val">Edgar Méndez Durán</div>
@@ -396,7 +206,6 @@
                     <a href="mailto:edgar.mendez@agricien.com">edgar.mendez@agricien.com</a> | <a href="mailto:edgar@geociencias.net">edgar@geociencias.net</a>
                 </div>
             </div>
-
             <div style="margin-top: 10px; border-top: 1px solid #444; padding-top: 10px; font-size: 9pt; color: #aaa; text-align: center;">
                 Desarrollo: © 2026 AgriCien S.A., Costa Rica
             </div>
@@ -417,117 +226,188 @@
     const MONTH_NAMES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const SHORT_MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
+    // Variables de Estado Espacial Global
     const map = L.map('map').setView([9.6, -84.0], 8);
     let activeMarker = null;
     let tiffImage = null;
     let rasterBounds = null; 
-    let rasterWidth = 0;
-    let rasterHeight = 0;
+    let rasterWidth = 0, rasterHeight = 0;
     let boundsConfigured = false; 
     let currentYearGlobal = 2015;
+    let activePixelCoords = null; // Guarda {posX, posY} del último clic válido
+
+    // Instancias de Gráficos
     let dailyChartInstance = null;
-    
+    let compareChartInstance = null;
     let mondayIndicesGlobal = [];
+    let fullMoonIndicesGlobal = []; // Índices donde ocurre luna llena en la serie actual
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-    // Lógica del Modal (About)
-    const modal = document.getElementById('aboutModal');
-    document.getElementById('openAbout').addEventListener('click', () => modal.classList.add('active'));
-    document.getElementById('closeAbout').addEventListener('click', () => modal.classList.remove('active'));
-    modal.addEventListener('click', (e) => { if(e.target === modal) modal.classList.remove('active'); });
+    // --- ALGORITMO ANALÍTICO DE MEEUS (FASE LUNAR) ---
+    function getLunarAge(year, month, day) {
+        let Y = year;
+        let M = month;
+        if (M === 1 || M === 2) {
+            Y = year - 1;
+            M = month + 12;
+        }
+        const A = Math.floor(Y / 100);
+        const B = Math.floor(A / 4);
+        const C = 2 - A + B;
+        const E = Math.floor(365.25 * (Y + 4716));
+        const G = Math.floor(30.6001 * (M + 1));
+        const JD = C + day + E + G - 1524.5;
 
-    const mondayLinesPlugin = {
-        id: 'mondayLines',
+        let D = JD - 2451550.26;
+        let F = (D / 29.530589) % 1;
+        if (F < 0) F += 1;
+        
+        return F * 29.530589; // Edad de la luna en días
+    }
+
+    // --- PLUGIN PERSONALIZADO PARA DIBUJAR LUNAS LLENAS Y LUNES ---
+    const climateAstroPlugin = {
+        id: 'climateAstroPlugin',
         afterDatasetsDraw(chart) {
             const { ctx, scales: { x, y } } = chart;
             ctx.save();
-            ctx.strokeStyle = 'rgba(3, 169, 244, 0.4)'; 
-            ctx.lineWidth = 1;
-            ctx.setLineDash([3, 3]); 
 
-            mondayIndicesGlobal.forEach(index => {
-                const meta = chart.getDatasetMeta(0);
-                if (meta.data[index]) {
-                    const xPos = meta.data[index].x;
-                    ctx.beginPath();
-                    ctx.moveTo(xPos, y.top);
-                    ctx.lineTo(xPos, y.bottom);
-                    ctx.stroke();
+            // 1. Dibujar líneas de Lunes
+            if (mondayIndicesGlobal && mondayIndicesGlobal.length > 0) {
+                ctx.strokeStyle = 'rgba(3, 169, 244, 0.35)'; 
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                mondayIndicesGlobal.forEach(idx => {
+                    const meta = chart.getDatasetMeta(0);
+                    if (meta.data[idx]) {
+                        const xPos = meta.data[idx].x;
+                        ctx.beginPath(); ctx.moveTo(xPos, y.top); ctx.lineTo(xPos, y.bottom); ctx.stroke();
+                    }
+                });
+            }
+
+            // 2. Dibujar Iconos de Luna Llena en gráficos de Línea/Barras
+            chart.data.datasets.forEach((dataset, datasetIdx) => {
+                const meta = chart.getDatasetMeta(datasetIdx);
+                // Solo renderizar si el dataset tiene puntos visibles asignados
+                if (!meta.hidden && meta.data.length > 0) {
+                    chart.data.labels.forEach((label, idx) => {
+                        if (!label) return;
+                        const parts = label.split('-');
+                        if (parts.length !== 3) return;
+                        
+                        const lAge = getLunarAge(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
+                        
+                        // Criterio astronómico: Rango de Luna Llena (14.76 +- 1.0 días)
+                        if (Math.abs(lAge - 14.76) <= 1.0) {
+                            const point = meta.data[idx];
+                            if (point) {
+                                const xPos = point.x;
+                                const yPos = point.y;
+
+                                // Dibujar círculo de Luna Llena brillante
+                                ctx.beginPath();
+                                ctx.arc(xPos, yPos, 5, 0, 2 * Math.PI);
+                                ctx.fillStyle = '#FFFFFF';
+                                ctx.shadowBlur = 6;
+                                ctx.shadowColor = '#FFF';
+                                ctx.fill();
+                                
+                                ctx.lineWidth = 1;
+                                ctx.strokeStyle = '#000000';
+                                ctx.stroke();
+                                ctx.shadowBlur = 0; // Reset
+                            }
+                        }
+                    });
                 }
             });
             ctx.restore();
         }
     };
 
-    function initChart() {
-        const ctx = document.getElementById('dailyChart').getContext('2d');
-        dailyChartInstance = new Chart(ctx, {
+    // --- CONTROLADOR DE PESTAÑAS (TABS) ---
+    document.querySelectorAll('.btn-nav').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (this.id === 'openAbout') return;
+            document.querySelectorAll('.btn-nav').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
+            this.classList.add('active');
+            document.getElementById(this.dataset.target).classList.add('active');
+            
+            // Forzar renderizado responsivo de los canvas al cambiar de pestaña
+            if (dailyChartInstance) dailyChartInstance.resize();
+            if (compareChartInstance) compareChartInstance.resize();
+        });
+    });
+
+    // Lógica Ventana Modal (About)
+    const modal = document.getElementById('aboutModal');
+    document.getElementById('openAbout').addEventListener('click', () => modal.classList.add('active'));
+    document.getElementById('closeAbout').addEventListener('click', () => modal.classList.remove('active'));
+    modal.addEventListener('click', (e) => { if(e.target === modal) modal.classList.remove('active'); });
+
+    // --- INITIALIZACIÓN DE GRÁFICOS ---
+    function initCharts() {
+        // Gráfico de Barras Principal
+        const ctxMain = document.getElementById('dailyChart').getContext('2d');
+        dailyChartInstance = new Chart(ctxMain, {
             type: 'bar',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Precipitación Diaria (mm)',
-                    data: [],
-                    backgroundColor: [], 
-                    borderWidth: 0,
-                    barPercentage: 1.0,
-                    categoryPercentage: 1.0
-                }]
-            },
+            data: { labels: [], datasets: [{ label: 'Precipitación Diaria (mm)', data: [], backgroundColor: [], borderWidth: 0, barPercentage: 1.0, categoryPercentage: 1.0 }] },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                resizeDelay: 100,
+                responsive: true, maintainAspectRatio: false, resizeDelay: 100,
                 scales: {
-                    x: { 
-                        grid: { display: false }, 
-                        ticks: { 
-                            color: '#aaa',
-                            font: { size: 9 },
-                            maxRotation: 45,
-                            autoSkip: false,
-                            callback: function(val, index) {
-                                const label = this.getLabelForValue(val);
-                                if (label && (label.endsWith("-01") || label.endsWith("-15"))) {
-                                    const parts = label.split('-');
-                                    const monthIdx = parseInt(parts[1]) - 1;
-                                    return label.endsWith("-01") ? SHORT_MONTHS[monthIdx] : parts[2];
-                                }
-                                return null;
-                            }
-                        } 
-                    },
-                    y: { 
-                        grid: { color: '#444' }, 
-                        title: { display: true, text: 'Precipitación (mm)', color: '#aaa', font: { size: 10 } }, 
-                        ticks: { color: '#aaa' } 
-                    }
+                    x: { grid: { display: false }, ticks: { color: '#aaa', font: { size: 9 }, maxRotation: 45, autoSkip: false, callback: function(val) { const label = this.getLabelForValue(val); if (label && (label.endsWith("-01") || label.endsWith("-15"))) { const parts = label.split('-'); return label.endsWith("-01") ? SHORT_MONTHS[parseInt(parts[1]) - 1] : parts[2]; } return null; } } },
+                    y: { grid: { color: '#444' }, title: { display: true, text: 'Precipitación (mm)', color: '#aaa', font: { size: 10 } }, ticks: { color: '#aaa' } }
+                },
+                plugins: { legend: { display: false } }
+            },
+            plugins: [climateAstroPlugin]
+        });
+
+        // Gráfico de Líneas Comparativo
+        const ctxCompare = document.getElementById('compareChart').getContext('2d');
+        compareChartInstance = new Chart(ctxCompare, {
+            type: 'line',
+            data: { labels: Array.from({length: 365}, (_, i) => `Día ${i + 1}`), datasets: [] },
+            options: {
+                responsive: true, maintainAspectRatio: false, resizeDelay: 100,
+                elements: { point: { radius: 0, hoverRadius: 4 } }, // Esconder puntos nativos para no saturar
+                scales: {
+                    x: { grid: { color: '#333' }, ticks: { color: '#aaa', font: { size: 9 }, maxTicksLimit: 20 } },
+                    y: { grid: { color: '#444' }, title: { display: true, text: 'Precipitación Acumulada Diaria (mm)', color: '#aaa' }, ticks: { color: '#aaa' } }
                 },
                 plugins: { 
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            title: function(context) { return `Fecha: ${context[0].label}`; }
-                        }
-                    }
+                    legend: { display: true, labels: { color: '#fff', font: { size: 10 } } },
+                    tooltip: { mode: 'index', intersect: false }
                 }
             },
-            plugins: [mondayLinesPlugin]
+            plugins: [climateAstroPlugin]
         });
     }
 
-    function setupSelector() {
+    function setupSelectorAndCheckboxes() {
         const selectEl = document.getElementById('layer-select');
+        const checkContainer = document.getElementById('compare-checkboxes');
+        
         YEARS.forEach(y => {
+            // Selector Principal
             const opt = document.createElement('option');
             opt.value = `CHELSA_prec_${y}_stack.tif`;
             opt.text = `Año ${y} (Daily Stack)`;
             selectEl.appendChild(opt);
+
+            // Checkboxes Comparativa
+            const label = document.createElement('label');
+            label.className = 'checkbox-item';
+            label.innerHTML = `<input type="checkbox" value="${y}" class="year-chk"> ${y}`;
+            checkContainer.appendChild(label);
         });
+        
         selectEl.value = "CHELSA_prec_2015_stack.tif";
         extractYear(selectEl.value);
-        initChart();
+        initCharts();
         initRemoteTiff(selectEl.value);
     }
 
@@ -545,33 +425,35 @@
         const labels = [];
         mondayIndicesGlobal = [];
         let dateObj = new Date(year, 0, 1);
-        
         for (let i = 0; i < totalBands; i++) {
-            const yyyy = dateObj.getFullYear();
             const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
             const dd = String(dateObj.getDate()).padStart(2, '0');
-            
-            labels.push(`${yyyy}-${mm}-${dd}`);
-            
-            if (dateObj.getDay() === 1) {
-                mondayIndicesGlobal.push(i);
-            }
+            labels.push(`${dateObj.getFullYear()}-${mm}-${dd}`);
+            if (dateObj.getDay() === 1) mondayIndicesGlobal.push(i);
             dateObj.setDate(dateObj.getDate() + 1);
         }
         return labels;
     }
 
-    function getInterpolatedColor(value, min, max) {
-        if (max === min) return '#1565C0'; 
-        const ratio = (value - min) / (max - min);
+    // Algoritmo de interpolación térmica de colores (Azul -> Verde -> Amarillo -> Anaranjado -> Rojo)
+    function getThermalGradientColor(value, min, max) {
+        if (max === min) return '#00E5FF';
+        const ratio = (value - min) / (max - min); // 1 es max lluvia (Azul), 0 es min lluvia (Rojo)
         
-        const r1 = 179, g1 = 229, b1 = 252;
-        const r2 = 13, g2 = 71, b2 = 161;
-        
-        const r = Math.round(r1 + ratio * (r2 - r1));
-        const g = Math.round(g1 + ratio * (g2 - g1));
-        const b = Math.round(b1 + ratio * (b2 - b1));
-        
+        let r = 0, g = 0, b = 0;
+        if (ratio > 0.75) { // Azul a Verde Claro
+            const segmentRatio = (ratio - 0.75) / 0.25;
+            r = Math.round(13 + (1-segmentRatio) * 30); g = Math.round(71 + segmentRatio * 150); b = Math.round(161 + (1-segmentRatio) * 50);
+        } else if (ratio > 0.50) { // Verde Claro a Amarillo
+            const segmentRatio = (ratio - 0.50) / 0.25;
+            r = Math.round(255 * (1 - segmentRatio)); g = 200; b = 0;
+        } else if (ratio > 0.25) { // Amarillo a Anaranjado
+            const segmentRatio = (ratio - 0.25) / 0.25;
+            r = 255; g = Math.round(200 * segmentRatio + 100 * (1 - segmentRatio)); b = 0;
+        } else { // Anaranjado a Rojo Fuego
+            const segmentRatio = ratio / 0.25;
+            r = 255; g = Math.round(100 * segmentRatio); b = 0;
+        }
         return `rgb(${r}, ${g}, ${b})`;
     }
 
@@ -579,134 +461,90 @@
         if (!fileName) return;
         extractYear(fileName);
         printLog(`Estableciendo pasarela con stream binario de: ${fileName}`);
-        
         const rawUrl = `https://media.githubusercontent.com/media/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${fileName}`;
 
         try {
             const tiffInstance = await GeoTIFF.fromUrl(rawUrl, { forceCSPIsolation: true });
             tiffImage = await tiffInstance.getImage();
-
             rasterWidth = tiffImage.getWidth();
             rasterHeight = tiffImage.getHeight();
             rasterBounds = tiffImage.getBoundingBox();
 
-            printLog(`Metadatos GeoTIFF decodificados.`);
-
             if (!boundsConfigured) {
                 const padding = 0.05;
-                const southWest = L.latLng(rasterBounds[1] - padding, rasterBounds[0] - padding);
-                const northEast = L.latLng(rasterBounds[3] + padding, rasterBounds[2] + padding);
-                const strictBounds = L.latLngBounds(southWest, northEast);
-                
-                map.setMaxBounds(strictBounds);
-                map.fitBounds(strictBounds);
+                const strictBounds = L.latLngBounds(L.latLng(rasterBounds[1] - padding, rasterBounds[0] - padding), L.latLng(rasterBounds[3] + padding, rasterBounds[2] + padding));
+                map.setMaxBounds(strictBounds); map.fitBounds(strictBounds);
                 boundsConfigured = true;
-                printLog(`Restricción de área activa: Vista confinada a Costa Rica.`);
+                printLog(`Fijado geográfico completo sobre Costa Rica.`);
             }
-
-        } catch (err) {
-            printLog(`Error de lectura remota: ${err.message}`);
-        }
+        } catch (err) { printLog(`Error de lectura remota: ${err.message}`); }
     }
 
     document.getElementById('layer-select').addEventListener('change', e => initRemoteTiff(e.target.value));
 
+    // --- PIPELINE DE CONSULTA ESPACIAL POR CLIC ---
     map.on('click', async function(e) {
-        const lat = e.latlng.lat;
-        const lng = e.latlng.lng;
-
+        const lat = e.latlng.lat; const lng = e.latlng.lng;
         if (!tiffImage || !rasterBounds) return;
-
-        if (lng < rasterBounds[0] || lng > rasterBounds[2] || lat < rasterBounds[1] || lat > rasterBounds[3]) {
-            printLog("Clic fuera del área de cobertura del GeoTIFF.");
-            return;
-        }
+        if (lng < rasterBounds[0] || lng > rasterBounds[2] || lat < rasterBounds[1] || lat > rasterBounds[3]) return;
 
         document.getElementById('click-coords').innerHTML = `<b>Coordenadas del Píxel:</b> Lat: ${lat.toFixed(5)}, Lon: ${lng.toFixed(5)}`;
-
         if (activeMarker) map.removeLayer(activeMarker);
         activeMarker = L.marker([lat, lng]).addTo(map);
 
         const posX = Math.floor(((lng - rasterBounds[0]) / (rasterBounds[2] - rasterBounds[0])) * rasterWidth);
         const posY = Math.floor(((rasterBounds[3] - lat) / (rasterBounds[3] - rasterBounds[1])) * rasterHeight);
+        activePixelCoords = { posX, posY }; // Almacenar coordenadas de la celda activa
 
-        printLog(`Extrayendo datos de grilla [Col: ${posX}, Fila: ${posY}]...`);
+        printLog(`Muestreando celda matriz [X: ${posX}, Y: ${posY}]...`);
+        executeSingleAnalysis();
+    });
 
+    // Análisis unificado del tablero principal
+    async function executeSingleAnalysis() {
+        if (!activePixelCoords || !tiffImage) return;
         try {
-            const rasterData = await tiffImage.readRasters({ 
-                window: [posX, posY, posX + 1, posY + 1],
-                interleave: false
-            });
-            
+            const rasterData = await tiffImage.readRasters({ window: [activePixelCoords.posX, activePixelCoords.posY, activePixelCoords.posX + 1, activePixelCoords.posY + 1], interleave: false });
             const totalBands = rasterData.length;
             const CHELSA_SCALE_FACTOR = 0.1;
 
-            let totalAcum = 0;
-            let validDays = 0;
-            let countDry = 0;
-            let countRain = 0;
-
-            let maxDryStreak = 0;
-            let currentDryStreak = 0;
-            let maxRainStreak = 0;
-            let currentRainStreak = 0;
+            let totalAcum = 0, validDays = 0, countDry = 0, countRain = 0;
+            let maxDryStreak = 0, currentDryStreak = 0, maxRainStreak = 0, currentRainStreak = 0;
 
             const daysInMonths = getDaysInMonths(currentYearGlobal);
             const monthlyTotals = new Array(12).fill(0);
             const monthlyValidDays = new Array(12).fill(0);
-
-            let currentMonthIdx = 0;
-            let daysAccumulatedInCurrentMonth = 0;
+            let currentMonthIdx = 0, daysAccumulatedInCurrentMonth = 0;
             
             const chartDataArray = [];
             const dayToMonthMapping = []; 
 
             for (let i = 0; i < totalBands; i++) {
                 let cellVal = rasterData[i][0];
-                
                 if (cellVal !== null && cellVal !== -9999 && !isNaN(cellVal)) {
                     cellVal = cellVal * CHELSA_SCALE_FACTOR;
                     if (cellVal < 0) cellVal = 0; 
-
-                    totalAcum += cellVal;
-                    validDays++;
+                    totalAcum += cellVal; validDays++;
                     chartDataArray.push(cellVal);
                     dayToMonthMapping.push(currentMonthIdx);
 
                     if (cellVal === 0) {
-                        countDry++;
-                        currentDryStreak++;
+                        countDry++; currentDryStreak++;
                         if (currentDryStreak > maxDryStreak) maxDryStreak = currentDryStreak;
                         currentRainStreak = 0;
                     } else {
-                        countRain++;
-                        currentRainStreak++;
+                        countRain++; currentRainStreak++;
                         if (currentRainStreak > maxRainStreak) maxRainStreak = currentRainStreak;
                         currentDryStreak = 0;
                     }
 
-                    monthlyTotals[currentMonthIdx] += cellVal;
-                    monthlyValidDays[currentMonthIdx]++;
-                    
+                    monthlyTotals[currentMonthIdx] += cellVal; monthlyValidDays[currentMonthIdx]++;
                     daysAccumulatedInCurrentMonth++;
-                    if (daysAccumulatedInCurrentMonth >= daysInMonths[currentMonthIdx]) {
-                        currentMonthIdx++;
-                        daysAccumulatedInCurrentMonth = 0;
-                    }
+                    if (daysAccumulatedInCurrentMonth >= daysInMonths[currentMonthIdx]) { currentMonthIdx++; daysAccumulatedInCurrentMonth = 0; }
                 }
             }
 
-            if (validDays === 0) {
-                clearValues();
-                document.getElementById('raster-bands-info').innerText = "Celda ubicada en zona marítima o sin datos.";
-                return;
-            }
-
-            let maxMonthVal = -Infinity;
-            let minMonthVal = Infinity;
-            let bestMonthIdx = 0;
-            let worstMonthIdx = 0;
-
+            let maxMonthVal = -Infinity, minMonthVal = Infinity, bestMonthIdx = 0, worstMonthIdx = 0;
             for (let m = 0; m < 12; m++) {
                 if (monthlyValidDays[m] > 0) {
                     const mVal = monthlyTotals[m];
@@ -717,83 +555,98 @@
 
             const barColorsArray = [];
             for (let i = 0; i < validDays; i++) {
-                const monthOfBar = dayToMonthMapping[i];
-                const rainOfMmonth = monthlyTotals[monthOfBar];
-                const interpolatedColor = getInterpolatedColor(rainOfMmonth, minMonthVal, maxMonthVal);
-                barColorsArray.push(interpolatedColor);
+                barColorsArray.push(getThermalGradientColor(monthlyTotals[dayToMonthMapping[i]], minMonthVal, maxMonthVal));
             }
 
-            const promedio = totalAcum / validDays;
-            const calendarLabels = generateCalendarLabels(currentYearGlobal, validDays);
-
-            dailyChartInstance.data.labels = calendarLabels;
+            dailyChartInstance.data.labels = generateCalendarLabels(currentYearGlobal, validDays);
             dailyChartInstance.data.datasets[0].data = chartDataArray;
             dailyChartInstance.data.datasets[0].backgroundColor = barColorsArray;
             dailyChartInstance.update();
 
             document.getElementById('stat-acum').innerText = `${totalAcum.toFixed(1)} mm`;
-            document.getElementById('stat-prom').innerText = `${promedio.toFixed(2)} mm/d`;
+            document.getElementById('stat-prom').innerText = `${totalAcum / validDays.toFixed(2)} mm/d`;
             document.getElementById('stat-days-rain').innerText = `${countRain} días`;
             document.getElementById('stat-days-dry').innerText = `${countDry} días`;
             document.getElementById('stat-streak-dry').innerText = `${maxDryStreak} días seguidos`;
             document.getElementById('stat-streak-rain').innerText = `${maxRainStreak} días seguidos`;
             
-            const cardDry = document.getElementById('card-month-dry');
-            const cardRain = document.getElementById('card-month-rain');
-            
+            const cardDry = document.getElementById('card-month-dry'); const cardRain = document.getElementById('card-month-rain');
             document.getElementById('stat-month-dry').innerText = `${MONTH_NAMES[worstMonthIdx]} (${minMonthVal.toFixed(1)} mm)`;
             document.getElementById('stat-month-rain').innerText = `${MONTH_NAMES[bestMonthIdx]} (${maxMonthVal.toFixed(1)} mm)`;
             
-            cardDry.style.backgroundColor = '#B3E5FC'; 
-            cardDry.style.color = '#0277BD'; 
-            document.getElementById('label-month-dry').style.color = '#0277BD';
-            document.getElementById('stat-month-dry').style.color = '#01579B';
-
-            cardRain.style.backgroundColor = '#0D47A1'; 
-            cardRain.style.color = '#FFFFFF';
-            document.getElementById('label-month-rain').style.color = '#E3F2FD';
-            document.getElementById('stat-month-rain').style.color = '#00E5FF'; 
-            
+            cardDry.style.backgroundColor = '#B3E5FC'; cardDry.style.color = '#0277BD';
+            cardRain.style.backgroundColor = '#0D47A1'; cardRain.style.color = '#FFFFFF';
             document.getElementById('raster-bands-info').innerText = `Procesamiento exitoso: ${validDays} capas analizadas de forma síncrona.`;
-            printLog(`Análisis estadístico y gráfico cromático multibanda completados.`);
-
-        } catch (err) {
-            printLog(`Error al procesar series de tiempo: ${err.message}`);
-        }
-    });
-
-    function clearValues() {
-        document.getElementById('stat-acum').innerText = "—";
-        document.getElementById('stat-prom').innerText = "—";
-        document.getElementById('stat-days-rain').innerText = "—";
-        document.getElementById('stat-days-dry').innerText = "—";
-        document.getElementById('stat-streak-dry').innerText = "—";
-        document.getElementById('stat-streak-rain').innerText = "—";
-        document.getElementById('stat-month-dry').innerText = "—";
-        document.getElementById('stat-month-rain').innerText = "—";
-        
-        const cardDry = document.getElementById('card-month-dry');
-        const cardRain = document.getElementById('card-month-rain');
-        cardDry.style.backgroundColor = '#2a2a2a'; cardDry.style.color = '#fff';
-        cardRain.style.backgroundColor = '#2a2a2a'; cardRain.style.color = '#fff';
-        document.getElementById('label-month-dry').style.color = '#b0b0b0';
-        document.getElementById('stat-month-dry').style.color = '#00ff00';
-        document.getElementById('label-month-rain').style.color = '#b0b0b0';
-        document.getElementById('stat-month-rain').style.color = '#00ff00';
-
-        document.getElementById('raster-bands-info').innerText = "";
-        mondayIndicesGlobal = [];
-        if (dailyChartInstance) {
-            dailyChartInstance.data.labels = [];
-            dailyChartInstance.data.datasets[0].data = [];
-            dailyChartInstance.data.datasets[0].backgroundColor = [];
-            dailyChartInstance.update();
-        }
+        } catch (err) { printLog(`Error: ${err.message}`); }
     }
+
+    // --- MOTOR MULTI-THREAD DE COMPARACIÓN INTERANUAL DE TEXTURAS ---
+    document.getElementById('btn-run-compare').addEventListener('click', async function() {
+        if (!activePixelCoords) { alert("Por favor, seleccione primero un punto geográfico de Costa Rica en el mapa del Tablero Principal."); return; }
+        
+        const checkedBoxes = document.querySelectorAll('.year-chk:checked');
+        if (checkedBoxes.length === 0) { alert("Debe seleccionar al menos un año de la lista para graficar la tendencia."); return; }
+
+        const selectedYears = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
+        printLog(`Iniciando extracción por bloques LFS para los años: [${selectedYears.join(', ')}]`);
+
+        // Estructura temporal para recolectar las curvas de lluvia
+        const yearlySeriesResults = [];
+
+        for (const year of selectedYears) {
+            const fileName = `CHELSA_prec_${year}_stack.tif`;
+            const rawUrl = `https://media.githubusercontent.com/media/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${fileName}`;
+            printLog(`Streaming remoto -> Año ${year}`);
+
+            try {
+                const instance = await GeoTIFF.fromUrl(rawUrl, { forceCSPIsolation: true });
+                const img = await instance.getImage();
+                const rasterData = await img.readRasters({ window: [activePixelCoords.posX, activePixelCoords.posY, activePixelCoords.posX + 1, activePixelCoords.posY + 1], interleave: false });
+                
+                let cumulativeSum = 0;
+                const dailyCurve = [];
+                const totalBands = rasterData.length;
+
+                for (let i = 0; i < totalBands; i++) {
+                    let v = rasterData[i][0];
+                    if (v !== null && v !== -9999 && !isNaN(v)) {
+                        v = v * 0.1; if (v < 0) v = 0;
+                        cumulativeSum += v;
+                    }
+                    dailyCurve.push(cumulativeSum); // Curva de precipitación acumulada
+                }
+
+                yearlySeriesResults.push({ year: year, totalRain: cumulativeSum, curve: dailyCurve });
+            } catch (err) { printLog(`Error extrayendo año ${year}: ${err.message}`); }
+        }
+
+        // Encontrar extremos del grupo seleccionado para armar el degradado térmico analítico
+        const totalRainfalls = yearlySeriesResults.map(s => s.totalRain);
+        const maxRainSelected = Math.max(...totalRainfalls);
+        const minRainSelected = Math.min(...totalRainfalls);
+
+        // Mapear los arreglos hacia la estructura interna de Chart.js
+        compareChartInstance.data.datasets = yearlySeriesResults.map(series => {
+            const hexColor = getThermalGradientColor(series.totalRain, minRainSelected, maxRainSelected);
+            return {
+                label: `Año ${series.year} (Σ ${series.totalRain.toFixed(1)} mm)`,
+                data: series.curve,
+                borderColor: hexColor,
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                tension: 0.1
+            };
+        });
+
+        // Configurar etiquetas base del eje X (Se asume un año estándar de 365 días)
+        compareChartInstance.data.labels = generateCalendarLabels(selectedYears[0], 365);
+        compareChartInstance.update();
+        printLog("¡Gráfico de tendencias interanuales e hitos lunares actualizado!");
+    });
 
     function printLog(msg) { const consoleEl = document.getElementById('console-log'); consoleEl.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`; consoleEl.scrollTop = consoleEl.scrollHeight; }
     
-    setupSelector();
+    setupSelectorAndCheckboxes();
 </script>
 </body>
 </html>
