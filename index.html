@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador ENOS Costa Rica - AgriCien</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root { --bg-dark: #202020; --container-bg: #2d2d2d; --border-color: #555555; --accent-purple: #9C27B0; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background-color: var(--bg-dark); color: #ffffff; }
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1500px; margin: 0 auto; }
+        @media (max-width: 900px) { .dashboard { grid-template-columns: 1fr; } }
+        .panel { background: var(--container-bg); border-radius: 8px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 15px; }
+        h2 { margin-top: 0; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; font-size: 14pt; }
+        #map { height: 500px; width: 100%; border-radius: 6px; border: 1px solid var(--border-color); }
+        select { width: 100%; padding: 12px; border-radius: 6px; background: #383838; color: white; border: 1px solid var(--border-color); font-size: 11pt; }
+        .result-box { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; }
+        .value-display { font-size: 26pt; font-weight: bold; color: #00ff00; text-align: center; margin: 10px 0; }
+        #console-log { width: 100%; height: 180px; font-family: 'Courier New', monospace; font-size: 9pt; background: #111111; color: #00ff00; padding: 10px; box-sizing: border-box; border-radius: 4px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #444; }
+        .meta-text { font-size: 10pt; color: #ccc; line-height: 1.4; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <div class="panel">
+        <h2>1. Serie Temporal de Precipitación (CHELSA)</h2>
+        <div>
+            <label style="font-size: 9pt; color: #aaa; display:block; margin-bottom:5px;">Seleccione el stack anual:</label>
+            <select id="layer-select"></select>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <div class="panel">
+        <h2>2. Análisis Estadístico del Píxel</h2>
+        <div id="click-coords" style="color: #aaa;">Coordenadas: Seleccione un punto en el mapa...</div>
+        <div class="result-box">
+            <div style="text-align: center; color: #aaa;">Valor estimado en la celda:</div>
+            <div class="value-display" id="pixel-value">—</div>
+            <div id="raster-info" class="meta-text"></div>
+        </div>
+        <h2>Consola del Pipeline Geoespacial</h2>
+        <div id="console-log">Entorno web inicializado.</div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
+
+<script>
+    // Configuración dura basada en tus archivos reales subidos
+    const REPO_OWNER = "agricien";
+    const REPO_NAME = "enos";
+    const BRANCH = "main";
+    
+    // Lista explícita basada en tu estructura para evitar fallos con la API de punteros LFS
+    const YEARS = [2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2020,2021,2022,2023,2024,2025];
+
+    const map = L.map('map').setView([9.7489, -83.7534], 8);
+    let activeMarker = null;
+    let currentBBoxLayer = null;
+    let tiffImage = null;
+    let rasterBounds = null; 
+    let rasterWidth = 0;
+    let rasterHeight = 0;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+    function setupSelector() {
+        const selectEl = document.getElementById('layer-select');
+        YEARS.forEach(y => {
+            const opt = document.createElement('option');
+            opt.value = `CHELSA_prec_${y}_stack.tif`;
+            opt.text = `Año ${y} (Multi-temporal Stack)`;
+            selectEl.appendChild(opt);
+        });
+        initRemoteTiff(selectEl.value);
+    }
+
+    async function initRemoteTiff(fileName) {
+        if (!fileName) return;
+        printLog(`Conectando mediante HTTP Range Requests al objeto LFS: ${fileName}`);
+        
+        // El truco para saltarse el puntero LFS y leer el binario real en GitHub Pages es usar la ruta de Pages o el endpoint de Git LFS.
+        // Usamos la ruta directa de descarga del media de GitHub que sí resuelve el puntero binario:
+        const rawUrl = `https://media.githubusercontent.com/media/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${fileName}`;
+
+        try {
+            const tiffInstance = await GeoTIFF.fromUrl(rawUrl);
+            tiffImage = await tiffInstance.getImage();
+
+            rasterWidth = tiffImage.getWidth();
+            rasterHeight = tiffImage.getHeight();
+            rasterBounds = tiffImage.getBoundingBox();
+
+            printLog(`Estructura GeoTIFF leída de forma remota.`);
+            document.getElementById('raster-info').innerHTML = `
+                <b>Metadatos de la Capa Activa:</b><br>
+                • Archivo: ${fileName}<br>
+                • Dimensión: ${rasterWidth} x ${rasterHeight} píxeles<br>
+                • Proyección: EPSG:4326 (WGS84)
+            `;
+
+            if (currentBBoxLayer) map.removeLayer(currentBBoxLayer);
+            const boundsLeaflet = [[rasterBounds[1], rasterBounds[0]], [rasterBounds[3], rasterBounds[2]]];
+            currentBBoxLayer = L.rectangle(boundsLeaflet, {color: "#9C27B0", weight: 1.5, fillOpacity: 0.05}).addTo(map);
+
+        } catch (err) {
+            printLog(`Error de lectura remota: ${err.message}`);
+        }
+    }
+
+    document.getElementById('layer-select').addEventListener('change', e => initRemoteTiff(e.target.value));
+
+    map.on('click', async function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        document.getElementById('click-coords').innerHTML = `<b>Coordenadas:</b> Lat: ${lat.toFixed(5)}, Lon: ${lng.toFixed(5)}`;
+
+        if (activeMarker) map.removeLayer(activeMarker);
+        activeMarker = L.marker([lat, lng]).addTo(map);
+
+        if (!tiffImage || !rasterBounds) return;
+
+        if (lng < rasterBounds[0] || lng > rasterBounds[2] || lat < rasterBounds[1] || lat > rasterBounds[3]) {
+            setPixelUIResult("Fuera de Cobertura", "#ff0000");
+            return;
+        }
+
+        const posX = Math.floor(((lng - rasterBounds[0]) / (rasterBounds[2] - rasterBounds[0])) * rasterWidth);
+        const posY = Math.floor(((rasterBounds[3] - lat) / (rasterBounds[3] - rasterBounds[1])) * rasterHeight);
+
+        printLog(`Solicitando bloque binario para celda [X: ${posX}, Y: ${posY}]...`);
+
+        try {
+            const rasterData = await tiffImage.readRasters({ window: [posX, posY, posX + 1, posY + 1] });
+            const value = rasterData[0][0];
+            
+            // Si tus stacks tienen múltiples bandas (ej. meses), rasterData[0], rasterData[1] contendrán el resto de dimensiones.
+            if (value === -9999 || isNaN(value)) {
+                setPixelUIResult("NoData", "#ffaa00");
+            } else {
+                setPixelUIResult(`${value.toFixed(1)} mm`, "#00ff00");
+            }
+        } catch (err) {
+            printLog(`Error al decodificar píxel: ${err.message}`);
+        }
+    });
+
+    function setPixelUIResult(text, color) { const el = document.getElementById('pixel-value'); el.innerText = text; el.style.color = color; }
+    function printLog(msg) { const consoleEl = document.getElementById('console-log'); consoleEl.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`; consoleEl.scrollTop = consoleEl.scrollHeight; }
+    
+    setupSelector();
+</script>
+</body>
+</html>
