@@ -12,12 +12,16 @@
         @media (max-width: 900px) { .dashboard { grid-template-columns: 1fr; } }
         .panel { background: var(--container-bg); border-radius: 8px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 15px; }
         h2 { margin-top: 0; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; font-size: 14pt; }
-        #map { height: 500px; width: 100%; border-radius: 6px; border: 1px solid var(--border-color); }
+        #map { height: 450px; width: 100%; border-radius: 6px; border: 1px solid var(--border-color); }
         select { width: 100%; padding: 12px; border-radius: 6px; background: #383838; color: white; border: 1px solid var(--border-color); font-size: 11pt; }
         .result-box { background: #1e1e1e; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; }
-        .value-display { font-size: 26pt; font-weight: bold; color: #00ff00; text-align: center; margin: 10px 0; }
-        #console-log { width: 100%; height: 180px; font-family: 'Courier New', monospace; font-size: 9pt; background: #111111; color: #00ff00; padding: 10px; box-sizing: border-box; border-radius: 4px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #444; }
-        .meta-text { font-size: 10pt; color: #ccc; line-height: 1.4; }
+        #console-log { width: 100%; height: 120px; font-family: 'Courier New', monospace; font-size: 9pt; background: #111111; color: #00ff00; padding: 10px; box-sizing: border-box; border-radius: 4px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #444; }
+        
+        /* Tabla de series de tiempo mensuales */
+        .months-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+        .month-card { background: #333; padding: 8px; border-radius: 4px; text-align: center; border: 1px solid #444; }
+        .month-name { font-size: 8pt; color: #aaa; text-transform: uppercase; }
+        .month-val { font-size: 12pt; font-weight: bold; color: #00ff00; }
     </style>
 </head>
 <body>
@@ -33,12 +37,24 @@
     </div>
 
     <div class="panel">
-        <h2>2. Análisis Estadístico del Píxel</h2>
+        <h2>2. Análisis Multibanda (Precipitación Mensual)</h2>
         <div id="click-coords" style="color: #aaa;">Coordenadas: Seleccione un punto en el mapa...</div>
         <div class="result-box">
-            <div style="text-align: center; color: #aaa;">Valor estimado en la celda:</div>
-            <div class="value-display" id="pixel-value">—</div>
-            <div id="raster-info" class="meta-text"></div>
+            <div style="font-weight: bold; color: #ccc; margin-bottom: 5px;">Distribución mensual estimada (mm):</div>
+            <div class="months-grid" id="months-container">
+                <div class="month-card"><div class="month-name">Ene</div><div class="month-val" id="m0">—</div></div>
+                <div class="month-card"><div class="month-name">Feb</div><div class="month-val" id="m1">—</div></div>
+                <div class="month-card"><div class="month-name">Mar</div><div class="month-val" id="m2">—</div></div>
+                <div class="month-card"><div class="month-name">Abr</div><div class="month-val" id="m3">—</div></div>
+                <div class="month-card"><div class="month-name">May</div><div class="month-val" id="m4">—</div></div>
+                <div class="month-card"><div class="month-name">Jun</div><div class="month-val" id="m5">—</div></div>
+                <div class="month-card"><div class="month-name">Jul</div><div class="month-val" id="m6">—</div></div>
+                <div class="month-card"><div class="month-name">Ago</div><div class="month-val" id="m7">—</div></div>
+                <div class="month-card"><div class="month-name">Sep</div><div class="month-val" id="m8">—</div></div>
+                <div class="month-card"><div class="month-name">Oct</div><div class="month-val" id="m9">—</div></div>
+                <div class="month-card"><div class="month-name">Nov</div><div class="month-val" id="m10">—</div></div>
+                <div class="month-card"><div class="month-name">Dic</div><div class="month-val" id="m11">—</div></div>
+            </div>
         </div>
         <h2>Consola del Pipeline Geoespacial</h2>
         <div id="console-log">Entorno web inicializado.</div>
@@ -49,12 +65,6 @@
 <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
 
 <script>
-    // Configuración dura basada en tus archivos reales subidos
-    const REPO_OWNER = "agricien";
-    const REPO_NAME = "enos";
-    const BRANCH = "main";
-    
-    // Lista explícita basada en tu estructura para evitar fallos con la API de punteros LFS
     const YEARS = [2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2020,2021,2022,2023,2024,2025];
 
     const map = L.map('map').setView([9.7489, -83.7534], 8);
@@ -80,11 +90,10 @@
 
     async function initRemoteTiff(fileName) {
         if (!fileName) return;
-        printLog(`Conectando mediante HTTP Range Requests al objeto LFS: ${fileName}`);
+        printLog(`Conectando al archivo raster: ${fileName}`);
         
-        // El truco para saltarse el puntero LFS y leer el binario real en GitHub Pages es usar la ruta de Pages o el endpoint de Git LFS.
-        // Usamos la ruta directa de descarga del media de GitHub que sí resuelve el puntero binario:
-        const rawUrl = `https://media.githubusercontent.com/media/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${fileName}`;
+        // CORRECCIÓN DE RUTA: Apunta de manera relativa al mismo servidor de GitHub Pages
+        const rawUrl = `./${fileName}`;
 
         try {
             const tiffInstance = await GeoTIFF.fromUrl(rawUrl);
@@ -94,20 +103,14 @@
             rasterHeight = tiffImage.getHeight();
             rasterBounds = tiffImage.getBoundingBox();
 
-            printLog(`Estructura GeoTIFF leída de forma remota.`);
-            document.getElementById('raster-info').innerHTML = `
-                <b>Metadatos de la Capa Activa:</b><br>
-                • Archivo: ${fileName}<br>
-                • Dimensión: ${rasterWidth} x ${rasterHeight} píxeles<br>
-                • Proyección: EPSG:4326 (WGS84)
-            `;
+            printLog(`Cabeceras GeoTIFF leídas de forma local/relativa.`);
 
             if (currentBBoxLayer) map.removeLayer(currentBBoxLayer);
             const boundsLeaflet = [[rasterBounds[1], rasterBounds[0]], [rasterBounds[3], rasterBounds[2]]];
             currentBBoxLayer = L.rectangle(boundsLeaflet, {color: "#9C27B0", weight: 1.5, fillOpacity: 0.05}).addTo(map);
 
         } catch (err) {
-            printLog(`Error de lectura remota: ${err.message}`);
+            printLog(`Error de lectura: ${err.message}. Asegúrese de que el archivo no sea un puntero de LFS en Pages.`);
         }
     }
 
@@ -124,31 +127,42 @@
         if (!tiffImage || !rasterBounds) return;
 
         if (lng < rasterBounds[0] || lng > rasterBounds[2] || lat < rasterBounds[1] || lat > rasterBounds[3]) {
-            setPixelUIResult("Fuera de Cobertura", "#ff0000");
+            printLog("Fuera de la cobertura del raster.");
+            clearValues();
             return;
         }
 
         const posX = Math.floor(((lng - rasterBounds[0]) / (rasterBounds[2] - rasterBounds[0])) * rasterWidth);
         const posY = Math.floor(((rasterBounds[3] - lat) / (rasterBounds[3] - rasterBounds[1])) * rasterHeight);
 
-        printLog(`Solicitando bloque binario para celda [X: ${posX}, Y: ${posY}]...`);
+        printLog(`Muestreando celda matriz [X: ${posX}, Y: ${posY}] para las 12 bandas mensuales...`);
 
         try {
+            // Lee todas las bandas disponibles de la ventana seleccionada
             const rasterData = await tiffImage.readRasters({ window: [posX, posY, posX + 1, posY + 1] });
-            const value = rasterData[0][0];
             
-            // Si tus stacks tienen múltiples bandas (ej. meses), rasterData[0], rasterData[1] contendrán el resto de dimensiones.
-            if (value === -9999 || isNaN(value)) {
-                setPixelUIResult("NoData", "#ffaa00");
-            } else {
-                setPixelUIResult(`${value.toFixed(1)} mm`, "#00ff00");
+            // Iterar sobre las primeras 12 bandas (Meses) del stack raster
+            for (let i = 0; i < 12; i++) {
+                const cellVal = rasterData[i] ? rasterData[i][0] : null;
+                const el = document.getElementById(`m${i}`);
+                if (cellVal === null || cellVal === -9999 || isNaN(cellVal)) {
+                    el.innerText = "N/D";
+                    el.style.color = "#ffaa00";
+                } else {
+                    el.innerText = `${cellVal.toFixed(1)}`;
+                    el.style.color = "#00ff00";
+                }
             }
+            printLog(`Extracción temporal completa.`);
         } catch (err) {
-            printLog(`Error al decodificar píxel: ${err.message}`);
+            printLog(`Error al decodificar bandas: ${err.message}`);
         }
     });
 
-    function setPixelUIResult(text, color) { const el = document.getElementById('pixel-value'); el.innerText = text; el.style.color = color; }
+    function clearValues() {
+        for(let i=0; i<12; i++) { document.getElementById(`m${i}`).innerText = "—"; document.getElementById(`m${i}`).style.color = "#fff"; }
+    }
+
     function printLog(msg) { const consoleEl = document.getElementById('console-log'); consoleEl.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`; consoleEl.scrollTop = consoleEl.scrollHeight; }
     
     setupSelector();
